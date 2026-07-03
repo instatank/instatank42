@@ -1,0 +1,7 @@
+.env
+venv/
+__pycache__/
+*.pyc
+# personal memory stays on the server, not in git
+memory/sessions/
+memory/usage/

@@ -1,0 +1,22 @@
+[Unit]
+Description=Personal Telegram AI agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=agent
+WorkingDirectory=/opt/instatank-agent
+EnvironmentFile=/opt/instatank-agent/.env
+ExecStart=/opt/instatank-agent/venv/bin/python bot.py
+Restart=always
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/instatank-agent/memory
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
