@@ -20,21 +20,27 @@ PRICES = {
 
 DAILY_CAP_USD = float(os.environ.get("DAILY_CAP_USD", "0.50"))
 
+# Anthropic server-side web search: $10 per 1,000 searches, on top of tokens.
+WEB_SEARCH_USD = 10.00 / 1000
+
 
 def cost_of(model: str, usage) -> float:
     """Cost in USD of one API response, from its usage block.
 
-    Cache writes bill at 1.25x input price, cache reads at 0.1x.
+    Cache writes bill at 1.25x input price, cache reads at 0.1x. Web searches
+    (usage.server_tool_use.web_search_requests) bill per search.
     """
     inp, out = PRICES[model]
     cache_write = getattr(usage, "cache_creation_input_tokens", 0) or 0
     cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+    srv = getattr(usage, "server_tool_use", None)
+    searches = (getattr(srv, "web_search_requests", 0) or 0) if srv else 0
     return (
         usage.input_tokens * inp
         + cache_write * inp * 1.25
         + cache_read * inp * 0.10
         + usage.output_tokens * out
-    ) / 1_000_000
+    ) / 1_000_000 + searches * WEB_SEARCH_USD
 
 
 def _usage_path() -> Path:

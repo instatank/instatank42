@@ -37,6 +37,11 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - **Cost guards (non-negotiable)**: `max_tokens=1000` per turn; daily ceiling
   `DAILY_CAP_USD` (default $0.50) computed from real API usage numbers and
   persisted to disk; 15-msgs/60s rate limit; tool loop capped at 3 rounds.
+- **Web search**: Anthropic's server-side `web_search_20250305` tool, always on
+  (disable via `WEB_SEARCH_MAX_USES=0`). Capped at 3 searches/message; $10 per
+  1k searches, billed into the daily cap via `usage.server_tool_use` in
+  budget.py. `pause_turn` stop reason is handled by re-sending (resumes the
+  server-side search loop). user_location pinned to New Delhi/IST.
 - **Security**: allowlist on his numeric Telegram ID; secrets only in `.env`
   (systemd `EnvironmentFile`); systemd hardening limits writes to `memory/`.
 - **Hosting**: Hetzner CX22-class Ubuntu 24.04, systemd `telegram-agent.service`,

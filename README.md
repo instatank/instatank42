@@ -8,6 +8,10 @@ locked to your Telegram ID.
 - You message the bot on Telegram (voice via Wispr Flow dictation works — it's just text to the bot).
 - Cheap fast model (Haiku) answers routine messages; the smarter model (Sonnet)
   kicks in automatically for longer/planning-type messages.
+- **Web search built in:** for anything time-sensitive (news, prices, current
+  events) the agent searches the web via Anthropic's server-side search tool
+  and cites what it finds. Capped at 3 searches per message (~1¢ each, inside
+  the daily budget cap).
 - Memory is plain files in `memory/`:
   - `profile.md` — who you are. Edit it freely; the agent reads it every turn.
     The agent also saves durable facts here on its own.

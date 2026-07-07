@@ -50,7 +50,11 @@ replies short unless depth is asked for — this is a chat app, not a report.
 
 When he tells you something durable about himself — a goal, preference, rule, \
 decision, or life fact worth remembering next week — save it with the \
-remember_fact tool (once per fact, only genuinely durable things)."""
+remember_fact tool (once per fact, only genuinely durable things).
+
+You can search the web (web_search). Use it whenever current information would \
+change the answer — news, prices, schedules, releases, anything after your \
+training data — instead of answering from memory. Mention your sources briefly."""
 
 TOOLS = [
     {
@@ -69,6 +73,24 @@ TOOLS = [
         },
     }
 ]
+
+# Anthropic's server-side web search: declared like a tool, but executed by
+# the API itself — results come back inside the same response, cited. Cost is
+# $10 per 1,000 searches (accounted in budget.py) + normal tokens; max_uses
+# caps searches per message. Set WEB_SEARCH_MAX_USES=0 in .env to disable.
+WEB_SEARCH_MAX_USES = int(os.environ.get("WEB_SEARCH_MAX_USES", "3"))
+WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": WEB_SEARCH_MAX_USES,
+    "user_location": {
+        "type": "approximate",
+        "city": "New Delhi",
+        "region": "Delhi",
+        "country": "IN",
+        "timezone": "Asia/Kolkata",
+    },
+}
 
 # DayOS memory-bank tools — read the local file mirror that dayos_sync.py
 # maintains (no network, no extra API cost per call beyond the tokens).
@@ -148,10 +170,13 @@ DAYOS_TOOLS = [
 def current_tools() -> list:
     """DayOS tools appear once sync is configured or data exists, so the bot
     works unchanged before the integration is set up."""
+    tools = list(TOOLS)
+    if WEB_SEARCH_MAX_USES > 0:
+        tools.append(WEB_SEARCH_TOOL)
     if dayos_store.has_data() or os.environ.get("FIREBASE_SERVICE_ACCOUNT_FILE") \
             or os.environ.get("FIREBASE_SERVICE_ACCOUNT"):
-        return TOOLS + DAYOS_TOOLS
-    return TOOLS
+        tools += DAYOS_TOOLS
+    return tools
 
 
 def handle_tool(name: str, args: dict) -> str:
@@ -231,6 +256,9 @@ def run_claude(model: str, messages: list) -> tuple[str, float, list]:
         )
         cost += budget.cost_of(model, response.usage)
         new_messages.append({"role": "assistant", "content": response.content})
+        if response.stop_reason == "pause_turn":
+            # server-side web search paused mid-turn; re-send to let it resume
+            continue
         if response.stop_reason != "tool_use":
             text = "".join(b.text for b in response.content if b.type == "text")
             return text.strip(), cost, new_messages
