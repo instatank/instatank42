@@ -22,6 +22,9 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - Next session: help him deploy, run the first `dayos_sync.py --full`, then
   verify the benchmark — daily use, facts remembered, DayOS questions answered
   from real data (checklist at the end of `docs/SECOND_BRAIN.md`).
+- **Read `docs/BACKLOG.md` every session** — the living tracker for planned
+  memory-bank integrations (WhatsApp chat history, trading journals, Drive
+  notes, ...), their status, and shared plumbing to club across them.
 
 ## Architecture decisions (settled — don't re-litigate)
 
@@ -88,5 +91,7 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   prompt snapshot
 - `tests/test_smoke.py`, `tests/test_dayos.py` — offline tests, no network
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
+- `docs/BACKLOG.md` — living tracker for planned integrations (WhatsApp,
+  trading journals, Drive notes, ...); read every session, update as things move
 - `deploy/` — `setup_vps.sh` (idempotent root script), `telegram-agent.service`,
   `dayos-sync.service` + `.timer`, `DEPLOY.md` (non-technical walkthrough)

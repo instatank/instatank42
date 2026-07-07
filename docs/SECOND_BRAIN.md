@@ -166,11 +166,13 @@ Key decisions (and why):
 
 ## Roadmap after this
 
-- **Drive notes bank (Phase 2 as originally scoped)** — same pattern:
-  read-only mirror into `memory/drive/`, reuse the search tool.
-- **Cross-bank search** — one tool that greps every bank at once (trivial
-  once two banks exist; skipped now to keep the tool list small).
-- **Proactive use** — morning/evening briefings composed from the DayOS
-  snapshot (Phase 3 "automations, only when asked").
+Tracked as a living backlog in **`docs/BACKLOG.md`** — read that for the full
+list of planned integrations (Drive notes, WhatsApp chat history, trading
+journals, ...), their status, and shared plumbing across them. Two
+standing principles that apply to all of them, not repeated per-entry there:
+
+- **Proactive use** — morning/evening briefings composed from bank snapshots
+  (Phase 3 "automations, only when asked") is a cross-cutting feature to add
+  once 2+ banks exist, not tied to any one integration.
 - **Semantic search / embeddings** — only if plain search demonstrably fails
-  on real questions. The bar stays where Phase 1 set it.
+  on real questions, for any bank. The bar stays where Phase 1 set it.
