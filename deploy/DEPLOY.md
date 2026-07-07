@@ -36,6 +36,46 @@ in during step 4.
    an **IP address** (four numbers like `203.0.113.42`). Copy it — you'll
    use it in the next step.
 
+---
+
+## ⚡ Fast path: let a helper script do steps 2–6
+
+If you'd rather not type the commands below by hand, there's a helper script
+you run **once on your own computer** (not on the server). It connects to your
+new server and does steps 2 through 6 for you — installs everything, saves your
+secret keys, and starts the bot.
+
+**You'll need:** your server's IP address (from step 1) and the three secret
+values from the table at the top of this file.
+
+**On a Mac (or Linux):** open **Terminal** and run these two lines:
+
+```
+curl -fsSL https://raw.githubusercontent.com/instatank/instatank42/HEAD/deploy/deploy_from_laptop.sh -o deploy_bot.sh
+bash deploy_bot.sh
+```
+
+**On Windows:** open **PowerShell** and run these two lines:
+
+```
+curl.exe -fsSL https://raw.githubusercontent.com/instatank/instatank42/HEAD/deploy/deploy_from_laptop.ps1 -o deploy_bot.ps1
+powershell -ExecutionPolicy Bypass -File deploy_bot.ps1
+```
+
+The script asks you to paste four things (your server's IP + the three
+secrets), then asks for the server's **root password** (the one Hetzner
+emailed you) once, to connect. It prints the bot's status at the end — when it
+shows a green **active (running)**, open Telegram and message your bot.
+
+*(Downloading and typing your root password only happens on your own computer.
+Your secret keys go straight to your server over the encrypted connection; the
+script doesn't store or send them anywhere else.)*
+
+Prefer to do it yourself step by step, or did the script hit an error? The
+manual steps 2–6 below do exactly the same thing, one command at a time.
+
+---
+
 ## 2. Connect to your server
 
 Open a terminal on your own computer:
