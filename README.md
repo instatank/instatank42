@@ -17,12 +17,19 @@ locked to your Telegram ID.
 - Hard cost guards: per-reply output cap, and a daily spend ceiling
   (`DAILY_CAP_USD`, default $0.50/day ≈ $15/month worst case). When hit, the
   bot politely refuses until midnight IST.
+- **DayOS second brain (optional):** `dayos_sync.py` mirrors your DayOS data
+  (journals, activity blocks, notes, project sessions, learning, trends) from
+  Firestore into `memory/dayos/` as organized markdown, and the agent can
+  search and read it to answer questions like "what did I do last Tuesday" or
+  "how was my week". Read-only — the agent never writes to DayOS. Setup:
+  `deploy/DEPLOY.md` step 7; architecture: `docs/SECOND_BRAIN.md`.
 
 ## Commands
 
 - `/start` — hello (also shows your numeric Telegram ID if you're not authorized yet)
 - `/remember <fact>` — manually save a fact to your profile
 - `/spend` — today's and this month's cost
+- `/sync` — refresh DayOS data now (`/sync full` re-pulls everything)
 
 ## Setup
 
@@ -38,4 +45,9 @@ Run locally: `python3 -m venv venv && venv/bin/pip install -r requirements.txt &
 
 ## Tests
 
-`venv/bin/python tests/test_smoke.py` — offline, no API key needed.
+Offline, no API key or network needed:
+
+```
+venv/bin/python tests/test_smoke.py
+venv/bin/python tests/test_dayos.py
+```

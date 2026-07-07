@@ -23,6 +23,7 @@ from telegram.ext import (
 )
 
 import budget
+import dayos_store
 import memory
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
@@ -69,6 +70,111 @@ TOOLS = [
     }
 ]
 
+# DayOS memory-bank tools — read the local file mirror that dayos_sync.py
+# maintains (no network, no extra API cost per call beyond the tokens).
+DAYOS_TOOLS = [
+    {
+        "name": "search_dayos",
+        "description": (
+            "Search everything the user logged in DayOS (his time-tracking + "
+            "journaling app): journals, notes, project sessions, learning entries, "
+            "activity blocks, weekly/monthly reviews. A single '#tag' query (e.g. "
+            "'#win') matches that exact tag only; any other query requires ALL "
+            "words to appear. Returns matching lines labeled by date/source, "
+            "newest first."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search words, or one '#tag'."}
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "dayos_day",
+        "description": (
+            "Full DayOS digest for one day: activity timeline with hours by "
+            "category, daily journal, captures, project sessions, learning, "
+            "end-of-day note, day rating, daily focus task."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "date": {"type": "string", "description": "'today', 'yesterday' or YYYY-MM-DD."}
+            },
+            "required": ["date"],
+        },
+    },
+    {
+        "name": "dayos_period",
+        "description": (
+            "Weekly or monthly DayOS rollup: hours by category and by project, "
+            "day ratings, focus-task completion, wins, plus his own Weekly/Monthly "
+            "Review answers and AI summary. Use for trends and 'how was my week/month'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "period": {
+                    "type": "string",
+                    "description": (
+                        "'this week', 'last week', 'this month', 'last month', "
+                        "'YYYY-MM', or any date inside the week you want."
+                    ),
+                }
+            },
+            "required": ["period"],
+        },
+    },
+    {
+        "name": "dayos_project",
+        "description": (
+            "Per-project log from DayOS: all work sessions (before/during/after "
+            "notes, done, pending, learned), project notes, tagged learning "
+            "entries, and hours logged."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Project name or its #tag."}
+            },
+            "required": ["name"],
+        },
+    },
+]
+
+
+def current_tools() -> list:
+    """DayOS tools appear once sync is configured or data exists, so the bot
+    works unchanged before the integration is set up."""
+    if dayos_store.has_data() or os.environ.get("FIREBASE_SERVICE_ACCOUNT_FILE") \
+            or os.environ.get("FIREBASE_SERVICE_ACCOUNT"):
+        return TOOLS + DAYOS_TOOLS
+    return TOOLS
+
+
+def handle_tool(name: str, args: dict) -> str:
+    """Execute one tool call, always returning a string for the model.
+    Errors come back as text (fail loud to the model, never crash the turn)."""
+    try:
+        if name == "remember_fact":
+            memory.append_fact(args["fact"])
+            log.info("Saved fact: %s", args["fact"])
+            return "Saved."
+        if name == "search_dayos":
+            return dayos_store.search(args.get("query", ""))
+        if name == "dayos_day":
+            return dayos_store.day(args.get("date", "today"))
+        if name == "dayos_period":
+            return dayos_store.period(args.get("period", "this week"))
+        if name == "dayos_project":
+            return dayos_store.project(args.get("name", ""))
+        return f"Unknown tool: {name}"
+    except Exception as e:
+        log.exception("Tool %s failed", name)
+        return f"Tool error in {name}: {e}"
+
 client = anthropic.Anthropic()
 
 # chat_id -> list of {"role", "content"} for the live conversation window
@@ -92,8 +198,10 @@ def pick_model(text: str) -> str:
 
 def build_system() -> list:
     """Static prompt + profile (cached) + volatile recent notes after the
-    cache breakpoint, so profile edits are the only thing that busts the cache."""
-    return [
+    cache breakpoint, so profile edits are the only thing that busts the cache.
+    The DayOS snapshot (today/yesterday digest) also sits after the breakpoint —
+    it changes through the day by design."""
+    parts = [
         {"type": "text", "text": SYSTEM_PROMPT},
         {
             "type": "text",
@@ -102,6 +210,10 @@ def build_system() -> list:
         },
         {"type": "text", "text": "## Recent session notes\n" + memory.recent_sessions()},
     ]
+    snapshot = dayos_store.prompt_snapshot()
+    if snapshot:
+        parts.append({"type": "text", "text": snapshot})
+    return parts
 
 
 def run_claude(model: str, messages: list) -> tuple[str, float, list]:
@@ -114,7 +226,7 @@ def run_claude(model: str, messages: list) -> tuple[str, float, list]:
             model=model,
             max_tokens=MAX_TOKENS,
             system=build_system(),
-            tools=TOOLS,
+            tools=current_tools(),
             messages=new_messages,
         )
         cost += budget.cost_of(model, response.usage)
@@ -122,16 +234,15 @@ def run_claude(model: str, messages: list) -> tuple[str, float, list]:
         if response.stop_reason != "tool_use":
             text = "".join(b.text for b in response.content if b.type == "text")
             return text.strip(), cost, new_messages
-        results = []
-        for block in response.content:
-            if block.type == "tool_use" and block.name == "remember_fact":
-                memory.append_fact(block.input["fact"])
-                log.info("Saved fact: %s", block.input["fact"])
-                results.append({
-                    "type": "tool_result",
-                    "tool_use_id": block.id,
-                    "content": "Saved.",
-                })
+        results = [
+            {
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": handle_tool(block.name, block.input),
+            }
+            for block in response.content
+            if block.type == "tool_use"
+        ]
         new_messages.append({"role": "user", "content": results})
     return "(I got stuck in a tool loop — try rephrasing.)", cost, new_messages
 
@@ -205,7 +316,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             "put it in TELEGRAM_ALLOWED_USER_ID if this bot is yours."
         )
         return
-    await update.message.reply_text("Hi — I'm your agent. Just talk to me. /remember saves a fact, /spend shows today's cost.")
+    await update.message.reply_text(
+        "Hi — I'm your agent. Just talk to me. /remember saves a fact, "
+        "/spend shows today's cost, /sync refreshes your DayOS data."
+    )
 
 
 async def cmd_remember(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -217,6 +331,37 @@ async def cmd_remember(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         return
     memory.append_fact(fact)
     await update.message.reply_text("Saved to your profile.")
+
+
+async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Refresh the DayOS mirror on demand. `/sync full` forces a complete re-pull."""
+    if not authorized(update):
+        return
+    import dayos_sync  # lazy: pulls httpx/cryptography only when actually used
+
+    if not dayos_sync.configured():
+        await update.message.reply_text(
+            "DayOS sync isn't set up yet — add FIREBASE_SERVICE_ACCOUNT_FILE to the "
+            ".env file on the server (deploy/DEPLOY.md has the walkthrough)."
+        )
+        return
+    mode = "full" if (context.args and context.args[0].lower() == "full") else "auto"
+    await update.message.reply_text("Syncing DayOS data…")
+    try:
+        status = await asyncio.to_thread(dayos_sync.sync, mode)
+    except Exception as e:  # surfaced, never silent — he must know it failed
+        log.exception("DayOS sync failed")
+        await send_reply(update, f"DayOS sync FAILED: {e}")
+        return
+    counts = status.get("counts", {})
+    core = ", ".join(
+        f"{counts[k]} {k}" for k in ("blocks", "captures", "dailyJournal", "sessions", "learning")
+        if k in counts
+    )
+    await update.message.reply_text(
+        f"Done ({status.get('mode')} sync, {status.get('duration_s')}s): {core}. "
+        f"{counts.get('digest_files', 0)} memory files up to date."
+    )
 
 
 async def cmd_spend(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -245,6 +390,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("remember", cmd_remember))
     app.add_handler(CommandHandler("spend", cmd_spend))
+    app.add_handler(CommandHandler("sync", cmd_sync))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     log.info("Bot starting (models: %s / %s, daily cap $%.2f)", HAIKU, SONNET, budget.DAILY_CAP_USD)
     app.run_polling(allowed_updates=Update.ALL_TYPES)

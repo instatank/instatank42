@@ -1,2 +1,5 @@
 python-telegram-bot~=22.3
 anthropic>=0.69
+# DayOS memory-bank sync (dayos_client.py): plain Firestore REST + JWT signing
+httpx>=0.27
+cryptography>=42
