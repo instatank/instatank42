@@ -1,9 +1,8 @@
 # BUILD BRIEF — The Second Brain (instatank42 memory banks)
 
-*Pre-filled by the 2026-07-12 strategy session from the founder's answers and
+*Filled by the 2026-07-12 strategy session from the founder's answers and
 the playbook template (`time-tracker/playbook/templates/BUILD_BRIEF.md`).
-Founder: edit anything that reads wrong — especially §4 and §6, which are
-promises only you can make.*
+**Founder-approved 2026-07-12** ("build brief sounds good").*
 
 **Date:** 2026-07-12
 **Tier it enters:** 1 — flagship, **as a stop-gap** (founder's words): active

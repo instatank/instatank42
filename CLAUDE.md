@@ -25,12 +25,13 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   notes, playbook, ...), their status, and shared plumbing to club across them.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py` and
   `venv/bin/python tests/test_dayos.py`).
-- **Branch hygiene warning:** this repo has NO `main` branch — work lives on
-  `claude/*` branches that never auto-merge, which is how a session on
-  2026-07-12 ended up planning against a 9-day-stale view. As of that date,
-  `claude/second-brain-strategy-9fumo8` merges all prior branches and is the
-  latest state. Pending founder call: create `main`, make it the default
-  branch, and merge everything there (mirrors the time-tracker flow).
+- **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
+  merging all prior `claude/*` branches — which never auto-merged and once
+  left a session planning against a 9-day-stale view). `main` is the source
+  of truth; **every session must merge its `claude/*` branch into `main`
+  before ending** until an auto-merge Action like time-tracker's is added.
+  Founder still owes one click: GitHub → Settings → change default branch
+  to `main`.
 
 ## Architecture decisions (settled — don't re-litigate)
 

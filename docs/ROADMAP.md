@@ -107,7 +107,8 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 | Date | Decision | Detail |
 |---|---|---|
 | 2026-07-12 | **Tier: instatank42 → Tier 1 (stop-gap)** | Flagship while second-brain work is the active focus; he expects to work on it in bursts between maturing the feeder products (Cadence, Meal-Planner, TradeGenie...). Revisit at the first monthly review — NORTH_STAR's tier table (in time-tracker) still says Parked and needs updating there. |
-| 2026-07-12 | **BUILD_BRIEF filled** | Saved at repo root (`BUILD_BRIEF.md`), pre-filled by the session, pending founder edits. |
+| 2026-07-12 | **BUILD_BRIEF filled + approved** | Saved at repo root (`BUILD_BRIEF.md`); founder approved same day. |
+| 2026-07-12 | **`main` branch created** | Founder-approved; all prior `claude/*` branches merged into it. Sessions merge to `main` before ending. Default-branch flip in GitHub settings still owed by founder (one click). |
 | 2026-07-12 | **Proactive cadence: Friday-only first** | Daily briefs must be earned by the Friday loop proving useful. |
 | 2026-07-12 | **DayOS mirror approach confirmed** | Founder: "the mirror idea for time tracker/dayos sounds good to me" — matches what was built. |
 
@@ -118,7 +119,10 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).
-- [ ] Founder call: create a `main` branch in this repo and make it the
-      default, so future sessions always see the latest state (the 2026-07-12
-      strategy session planned against a 9-day-stale branch because nothing
-      here auto-merges).
+- [x] Create a `main` branch merging all prior work — done 2026-07-12.
+- [ ] Founder: flip the repo's default branch to `main` (GitHub → Settings →
+      General → Default branch). One click; until then, fresh clones still
+      land on the stale first branch.
+- [ ] Optional: add time-tracker's auto-sync GitHub Action so `claude/*`
+      pushes merge to `main` automatically instead of relying on session
+      discipline.
