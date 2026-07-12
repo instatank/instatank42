@@ -23,8 +23,13 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - **Read `docs/BACKLOG.md` every session** — the living tracker for planned
   memory-bank integrations (WhatsApp chat history, trading journals, Drive
   notes, playbook, ...), their status, and shared plumbing to club across them.
-- Offline tests pass (`venv/bin/python tests/test_smoke.py` and
-  `venv/bin/python tests/test_dayos.py`).
+- **Playbook memory bank (Phase 2) code complete + tested offline** (2026-07-12):
+  `playbook_sync.py` git-mirrors time-tracker's `playbook/` + `LEARNINGS.md`;
+  bot tools `search_playbook` + `playbook_doc`. NOT yet running on the VPS —
+  needs the 5-minute setup in `deploy/DEPLOY.md` step 8 (founder-owned:
+  fine-grained GitHub token + two .env lines).
+- Offline tests pass (`venv/bin/python tests/test_smoke.py`,
+  `tests/test_dayos.py`, and `tests/test_playbook.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -68,6 +73,13 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   (same pattern as DayOS's own cron) — deliberately NO firebase-admin/grpc.
   The agent never writes to DayOS. Staleness/sync failures surface loudly in
   tool results — don't strip those warnings.
+- **Playbook bank**: `playbook_sync.py` keeps a read-only shallow git checkout
+  of time-tracker under `memory/playbook/repo/` (never a copied fork — the
+  playbook's own rule), refreshed by the same 2h timer (`ExecStart=-` so its
+  failure can't block the DayOS sync) + `/sync`. Bot tools: `search_playbook`,
+  `playbook_doc`. Config: `PLAYBOOK_REPO_URL` (+ `PLAYBOOK_REPO_TOKEN` for a
+  private repo — scrubbed from all output/status, never stored in the git
+  remote on disk).
 
 ## Lessons / gotchas
 
@@ -96,7 +108,12 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `dayos_digest.py` — pure raw→markdown transforms (days/weeks/months/projects)
 - `dayos_store.py` — read side: search/day/period/project, staleness warnings,
   prompt snapshot
-- `tests/test_smoke.py`, `tests/test_dayos.py` — offline tests, no network
+- `playbook_sync.py` — git-mirror orchestrator + CLI (`--status`), writes
+  `memory/playbook/` + `sync_status.json`
+- `playbook_store.py` — read side: search/doc lookup, staleness warnings,
+  prompt note
+- `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py` —
+  offline tests, no network (playbook sync tests clone a local file:// repo)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
 - `docs/ROADMAP.md` — phased second-brain roadmap + founder decision log
 - `docs/BACKLOG.md` — living tracker for planned integrations (WhatsApp,

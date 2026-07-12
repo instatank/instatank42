@@ -52,7 +52,7 @@ weekly/monthly reviews. Read-only Firestore mirror (building block #1).
 Full detail: `docs/SECOND_BRAIN.md`, contract doc
 `time-tracker/docs/second-brain-integration.md`.
 
-### Shared playbook + LEARNINGS (the principles layer) — 📋 Planned (next up, Phase 2 in `docs/ROADMAP.md`)
+### Shared playbook + LEARNINGS (the principles layer) — 🔨 Code built + tested (2026-07-12); awaiting VPS setup (`deploy/DEPLOY.md` step 8)
 
 **What:** the founder's accumulated working rules and lessons — the
 `playbook/` folder in `instatank/time-tracker` (PLAYBOOK, NORTH_STAR,
@@ -66,8 +66,9 @@ the VPS (the playbook is already plain markdown in git; no API, no parser,
 no cost). Standard sync-status file + staleness warnings + a read/search
 tool. Never fork a copy — pull it (playbook README rule).
 
-**Needs:** read access to the GitHub repo from the VPS (public clone or a
-read-only deploy key), ~1 session.
+**Needs (all that's left):** the founder's 5-minute VPS setup — a
+fine-grained GitHub token (Contents:read on time-tracker only) + two `.env`
+lines + first sync. Walkthrough: `deploy/DEPLOY.md` step 8.
 
 ### WhatsApp chat history — 📋 Planned
 

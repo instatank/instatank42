@@ -25,6 +25,7 @@ from telegram.ext import (
 import budget
 import dayos_store
 import memory
+import playbook_store
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -167,15 +168,58 @@ DAYOS_TOOLS = [
 ]
 
 
+# Playbook memory-bank tools — read the git mirror playbook_sync.py maintains.
+PLAYBOOK_TOOLS = [
+    {
+        "name": "search_playbook",
+        "description": (
+            "Search the user's written playbook: his cross-project working rules, "
+            "transferable lessons learned from real failures, skill-building North "
+            "Star (tracks, portfolio tiers), weekly technique curriculum, SOPs, and "
+            "per-repo LEARNINGS ledgers. Use whenever he asks about his own rules, "
+            "lessons, methods, priorities, or how he works. A single '#tag' query "
+            "matches that exact tag only; any other query requires ALL words."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search words, or one '#tag'."}
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "playbook_doc",
+        "description": (
+            "Read one playbook document in full. Names are forgiving: 'playbook' "
+            "(global rules + lessons), 'north star' (skill tracks + portfolio "
+            "tiers), 'curriculum' (technique-of-the-week ladder), 'learning "
+            "method', 'learnings' (friction/decision ledger), 'build brief' "
+            "(template), 'sop ship' / 'sop deploy' / 'sop firebase sync' / "
+            "'sop verify on phone', 'readme'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Document name, e.g. 'north star'."}
+            },
+            "required": ["name"],
+        },
+    },
+]
+
+
 def current_tools() -> list:
-    """DayOS tools appear once sync is configured or data exists, so the bot
-    works unchanged before the integration is set up."""
+    """Bank tools appear once their sync is configured or data exists, so the
+    bot works unchanged before each integration is set up."""
     tools = list(TOOLS)
     if WEB_SEARCH_MAX_USES > 0:
         tools.append(WEB_SEARCH_TOOL)
     if dayos_store.has_data() or os.environ.get("FIREBASE_SERVICE_ACCOUNT_FILE") \
             or os.environ.get("FIREBASE_SERVICE_ACCOUNT"):
         tools += DAYOS_TOOLS
+    if playbook_store.has_data() or os.environ.get("PLAYBOOK_REPO_URL"):
+        tools += PLAYBOOK_TOOLS
     return tools
 
 
@@ -195,6 +239,10 @@ def handle_tool(name: str, args: dict) -> str:
             return dayos_store.period(args.get("period", "this week"))
         if name == "dayos_project":
             return dayos_store.project(args.get("name", ""))
+        if name == "search_playbook":
+            return playbook_store.search(args.get("query", ""))
+        if name == "playbook_doc":
+            return playbook_store.doc(args.get("name", ""))
         return f"Unknown tool: {name}"
     except Exception as e:
         log.exception("Tool %s failed", name)
@@ -238,6 +286,9 @@ def build_system() -> list:
     snapshot = dayos_store.prompt_snapshot()
     if snapshot:
         parts.append({"type": "text", "text": snapshot})
+    pb_note = playbook_store.prompt_note()
+    if pb_note:
+        parts.append({"type": "text", "text": pb_note})
     return parts
 
 
@@ -362,34 +413,48 @@ async def cmd_remember(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Refresh the DayOS mirror on demand. `/sync full` forces a complete re-pull."""
+    """Refresh every configured memory bank on demand. `/sync full` forces a
+    complete DayOS re-pull. Failures are reported per bank, never silent."""
     if not authorized(update):
         return
     import dayos_sync  # lazy: pulls httpx/cryptography only when actually used
+    import playbook_sync
 
-    if not dayos_sync.configured():
+    if not dayos_sync.configured() and not playbook_sync.configured():
         await update.message.reply_text(
-            "DayOS sync isn't set up yet — add FIREBASE_SERVICE_ACCOUNT_FILE to the "
-            ".env file on the server (deploy/DEPLOY.md has the walkthrough)."
+            "No memory banks are set up yet — deploy/DEPLOY.md steps 7 (DayOS) "
+            "and 8 (playbook) have the walkthrough."
         )
         return
-    mode = "full" if (context.args and context.args[0].lower() == "full") else "auto"
-    await update.message.reply_text("Syncing DayOS data…")
-    try:
-        status = await asyncio.to_thread(dayos_sync.sync, mode)
-    except Exception as e:  # surfaced, never silent — he must know it failed
-        log.exception("DayOS sync failed")
-        await send_reply(update, f"DayOS sync FAILED: {e}")
-        return
-    counts = status.get("counts", {})
-    core = ", ".join(
-        f"{counts[k]} {k}" for k in ("blocks", "captures", "dailyJournal", "sessions", "learning")
-        if k in counts
-    )
-    await update.message.reply_text(
-        f"Done ({status.get('mode')} sync, {status.get('duration_s')}s): {core}. "
-        f"{counts.get('digest_files', 0)} memory files up to date."
-    )
+    await update.message.reply_text("Syncing memory banks…")
+    lines = []
+    if dayos_sync.configured():
+        mode = "full" if (context.args and context.args[0].lower() == "full") else "auto"
+        try:
+            status = await asyncio.to_thread(dayos_sync.sync, mode)
+            counts = status.get("counts", {})
+            core = ", ".join(
+                f"{counts[k]} {k}"
+                for k in ("blocks", "captures", "dailyJournal", "sessions", "learning")
+                if k in counts
+            )
+            lines.append(
+                f"DayOS ({status.get('mode')} sync, {status.get('duration_s')}s): {core}. "
+                f"{counts.get('digest_files', 0)} memory files up to date."
+            )
+        except Exception as e:  # surfaced, never silent — he must know it failed
+            log.exception("DayOS sync failed")
+            lines.append(f"DayOS sync FAILED: {e}")
+    if playbook_sync.configured():
+        try:
+            status = await asyncio.to_thread(playbook_sync.sync)
+            lines.append(
+                f"Playbook: commit {status.get('commit')}, {status.get('files')} docs."
+            )
+        except Exception as e:
+            log.exception("Playbook sync failed")
+            lines.append(f"Playbook sync FAILED: {e}")
+    await send_reply(update, "\n".join(lines))
 
 
 async def cmd_spend(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -1,5 +1,5 @@
 [Unit]
-Description=Run the DayOS memory-bank sync every 2 hours
+Description=Run the memory-bank sync (DayOS + playbook) every 2 hours
 
 [Timer]
 OnBootSec=2min

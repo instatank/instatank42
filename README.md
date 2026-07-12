@@ -27,13 +27,17 @@ locked to your Telegram ID.
   search and read it to answer questions like "what did I do last Tuesday" or
   "how was my week". Read-only — the agent never writes to DayOS. Setup:
   `deploy/DEPLOY.md` step 7; architecture: `docs/SECOND_BRAIN.md`.
+- **Playbook memory bank (optional):** `playbook_sync.py` keeps a read-only
+  git mirror of your written playbook (cross-project rules, lessons, North
+  Star, curriculum, LEARNINGS ledger) in `memory/playbook/`, so the agent can
+  quote your own rules back at you. Setup: `deploy/DEPLOY.md` step 8.
 
 ## Commands
 
 - `/start` — hello (also shows your numeric Telegram ID if you're not authorized yet)
 - `/remember <fact>` — manually save a fact to your profile
 - `/spend` — today's and this month's cost
-- `/sync` — refresh DayOS data now (`/sync full` re-pulls everything)
+- `/sync` — refresh all memory banks now (`/sync full` re-pulls all DayOS history)
 
 ## Setup
 
@@ -54,4 +58,5 @@ Offline, no API key or network needed:
 ```
 venv/bin/python tests/test_smoke.py
 venv/bin/python tests/test_dayos.py
+venv/bin/python tests/test_playbook.py
 ```

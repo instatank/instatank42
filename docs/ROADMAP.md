@@ -17,7 +17,7 @@ what was actually built and deployed.*
 |---|---|---|---|
 | 0 | Deploy the bot | ✅ **Done** (founder-confirmed 2026-07-12) | Live on the VPS, in daily use. |
 | 1 | DayOS memory bank | ✅ **Live** (built 2026-07-07; founder-verified in use 2026-07-12) | One residual task below. |
-| 2 | Principles layer — playbook + LEARNINGS | ⏭️ **Next up** | ~1 session. Detail below. |
+| 2 | Principles layer — playbook + LEARNINGS | 🔨 **Code built + tested** (2026-07-12) | Awaiting the 5-min VPS setup: `deploy/DEPLOY.md` step 8. |
 | 3 | Distillation + retrieval quality | 📋 Planned (after 2) | Mechanical digests already exist; this adds the AI-authored layer. |
 | 4 | Proactive loops | 📋 Planned (after 3) | **Founder decision: Friday-only first** — earn the daily slots. |
 | 5 | New sources, by gate | 🔁 Ongoing | Tracked per-source in `BACKLOG.md`; gate below. |
@@ -115,7 +115,10 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 ## Open items
 
 - [ ] Run the Phase-1 staleness drill (checklist item 5) once.
-- [ ] Phase 2: build the playbook/LEARNINGS bank.
+- [x] Phase 2 code: playbook/LEARNINGS bank — built + tested 2026-07-12.
+- [ ] Founder: Phase 2 VPS setup (`deploy/DEPLOY.md` step 8 — fine-grained
+      GitHub token + two `.env` lines + first sync). Then test: "what's my
+      rule about bundled fixes?"
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).
@@ -123,6 +126,6 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 - [ ] Founder: flip the repo's default branch to `main` (GitHub → Settings →
       General → Default branch). One click; until then, fresh clones still
       land on the stale first branch.
-- [ ] Optional: add time-tracker's auto-sync GitHub Action so `claude/*`
-      pushes merge to `main` automatically instead of relying on session
-      discipline.
+- [x] Auto-sync GitHub Action added (2026-07-12, founder-approved) —
+      `claude/*` pushes now merge to `main` automatically, same as
+      time-tracker.

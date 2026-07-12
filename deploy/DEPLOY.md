@@ -248,7 +248,64 @@ systemctl restart telegram-agent && systemctl start dayos-sync.timer
 - Voice notes sync as their titles (the audio itself isn't transcribed —
   you already use a separate transcription tool).
 
-## 8. Troubleshooting
+## 8. Teach the agent your playbook — optional, 5 minutes
+
+This gives the agent your written working rules — the `playbook/` folder in
+the time-tracker repo (PLAYBOOK, NORTH_STAR, CURRICULUM, the SOPs) plus the
+LEARNINGS ledger — so it can quote your own rules back at you and knows the
+technique-of-the-week. It refreshes on the same 2-hour timer as DayOS, and
+`/sync` refreshes it on demand.
+
+1. First make sure the server has the latest bot code (step 6 has the
+   update commands).
+
+2. GitHub needs to let the server read the time-tracker repo. Create a
+   **fine-grained personal access token**: on github.com click your avatar →
+   **Settings** → **Developer settings** (bottom of the left menu) →
+   **Fine-grained tokens** → **Generate new token**. Set:
+   - **Repository access:** "Only select repositories" → pick
+     `instatank/time-tracker` only.
+   - **Permissions → Repository permissions → Contents: Read-only.**
+     Leave everything else on "No access".
+   - Expiration: 1 year is fine.
+
+   Copy the token (starts with `github_pat_`) — you see it only once.
+
+3. On the server, open the settings file and add the playbook lines:
+
+```
+nano /opt/instatank-agent/.env
+```
+
+Add (or fill in, if you copied the newer `.env.example`):
+
+```
+PLAYBOOK_REPO_URL=https://github.com/instatank/time-tracker.git
+PLAYBOOK_REPO_TOKEN=github_pat_paste-yours-here
+```
+
+4. Run the first sync and restart the bot:
+
+```
+sudo -u agent /opt/instatank-agent/venv/bin/python /opt/instatank-agent/playbook_sync.py
+```
+*Downloads a read-only copy of the playbook into the agent's memory (a second or two). It should end with "done … N docs".*
+
+```
+systemctl restart telegram-agent
+```
+*Restarts the bot so the new playbook tools appear.*
+
+5. Test it: ask the bot *"what's my rule about bundled fixes?"* or *"what's
+   this week's technique?"* — it should quote the actual playbook.
+
+**Notes:**
+- The token can read that one repo and nothing else, and can't write
+  anywhere. It lives only in `.env` on the server, never in git.
+- If the sync ever says "SYNC FAILED", the bot will also warn you itself the
+  next time you ask a playbook question — run `/sync` after fixing.
+
+## 9. Troubleshooting
 
 **The service won't start / status shows "failed":**
 
