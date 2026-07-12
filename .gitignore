@@ -5,3 +5,8 @@ __pycache__/
 # personal memory stays on the server, not in git
 memory/sessions/
 memory/usage/
+memory/dayos/
+# Firebase service-account key (secret) — lives only on the server
+*.firebase-sa.json
+.firebase-sa.json
+firebase-sa*.json

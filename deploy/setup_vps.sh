@@ -69,8 +69,13 @@ mkdir -p "$APP_DIR/memory"
 
 echo "==> Installing systemd service..."
 cp "$APP_DIR/deploy/$SERVICE_NAME.service" /etc/systemd/system/
+cp "$APP_DIR/deploy/dayos-sync.service" /etc/systemd/system/
+cp "$APP_DIR/deploy/dayos-sync.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
+# DayOS sync timer: harmless before the Firebase key is configured (the script
+# exits cleanly with a "not configured" note until then).
+systemctl enable --now dayos-sync.timer
 
 # --- 7. Env file with secrets -------------------------------------------------
 

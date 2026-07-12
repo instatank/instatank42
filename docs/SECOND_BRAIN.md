@@ -1,192 +1,178 @@
-# SECOND_BRAIN — strategy + roadmap (plan of record)
+# The Second Brain — memory architecture for the personal agent
 
-**Status: PROPOSED 2026-07-12 — awaiting founder confirmation.** Decision points are
-marked ⚖️. Once confirmed, this doc is the plan of record that
-`time-tracker/docs/second-brain-integration.md` already points to.
+*Written 2026-07-07. This is the plan of record for how the agent's backend
+memory works and how external data systems (starting with DayOS) plug into it.
+Plain-English first; implementation notes where they matter.*
 
----
+## The idea in one paragraph
 
-## 1. What the second brain is (and isn't)
+The agent's "second brain" is not one database — it is a small set of
+**memory banks**, each one a folder of plain text files under `memory/` on the
+server. The bot reads them with simple tools (open a file, search for words).
+Anything can become a memory bank if it can be turned into organized text
+files. DayOS is the first external system wired in; Google Drive notes are
+next (that was already Phase 2); more can follow. No vector database, no
+embeddings — plain files and search, upgraded only if that demonstrably fails.
 
-Two components, deliberately separate:
+## Memory bank inventory
 
-- **The agent** (this repo's Telegram bot) — the mouth and ears. It talks, it remembers
-  conversation facts, it enforces budget caps. Phase 1, code complete.
-- **The second brain** — the memory layer *behind* the agent: read-only mirrors of the
-  founder's real data (DayOS first), his accumulated principles (the shared playbook),
-  and the bot's own distillations. Background plumbing, no UI of its own.
+| Bank | Where | Status | What it holds |
+|---|---|---|---|
+| Profile + facts | `memory/profile.md` | live (Phase 1) | Who he is; durable facts the agent saves via `remember_fact` |
+| Conversation log | `memory/sessions/*.md` | live (Phase 1) | Dated log of every bot conversation; last 2 days fed as context |
+| **DayOS** | `memory/dayos/` | **built (this doc)** | Journals, activity blocks, captures/notes, project sessions, learning log, ratings, reviews — his whole logged life |
+| Drive notes | `memory/drive/` (future) | planned (Phase 2) | His Google-Drive-synced notes, mirrored read-only the same way |
+| Spend | `memory/usage/*.json` | live (Phase 1) | Cost accounting (not model-visible) |
 
-The agent without the brain is a chatbot with a diary of its own chats. The brain without
-the agent is a folder nobody can talk to. They ship in that order: **mouth first, then
-memory, then proactivity.**
+The pattern every future bank must follow (this is the contract):
 
-## 2. Where things stand (reality check, 2026-07-12)
+1. **Read-only pull** — the agent never writes back into the source system.
+2. **Local plain-text mirror** — organized markdown the model can read raw;
+   an exact `raw/` copy kept alongside so digests can always be rebuilt.
+3. **A sync process with a status file** — and loud staleness warnings when
+   the mirror is old or the last sync failed. Silent staleness is the enemy.
+4. **Tools, not context-stuffing** — a compact ambient snapshot in the system
+   prompt; everything else fetched on demand so cost stays capped.
 
-1. **The contract exists; the consumer doesn't.** `time-tracker/docs/second-brain-integration.md`
-   defines exactly what this repo's sync job reads from DayOS's Firestore — but `dayos_sync.py`
-   has not been written. This doc closes the other dangling pointer.
-2. **The bot is not deployed.** Phase 1 is code-complete and smoke-tested, blocked only on
-   founder-owned steps: Hetzner VPS, BotFather token, separate Anthropic API key.
-3. **NORTH_STAR tiers this repo "4 — Parked (undeployed)."** Actively building the second
-   brain contradicts that. Per the founder's own rules: revival needs a `BUILD_BRIEF` and a
-   tier decision (⚖️ §8).
-4. **The second-richest corpus is already free to ingest.** The playbook + LEARNINGS ledgers
-   are plain markdown in git — mirroring them is a `git pull`, not a pipeline.
+## Where the second brain is stored (the Obsidian / Google Drive question)
 
-## 3. Design principles (each traces to a playbook rule/lesson)
+**Canonical copy: on the agent's VPS, as plain files.** The brain has to live
+where the thinking happens — the bot greps local files in milliseconds, with
+zero API cost, zero network dependency in the read path, and zero new failure
+modes. This is also just Phase 1's settled Karpathy-style-files decision
+extended to more data.
 
-1. **Read-only by construction, not by promise** (contract §"How the consumer connects").
-   The service account never gets write scope. The bot never writes to DayOS or any other
-   product's data — the duplicate-allergy lesson (L3) applied at the architecture level.
-2. **Mirrors and thoughts never mix.** Synced mirrors are disposable, regenerable artifacts;
-   everything the bot *authors* (digests, notes) lives in its own lane. One-way flow, no
-   merge logic, no sync contract on the brain side.
-3. **Fail loud, stale loudly** (Rule 4). Every source gets a heartbeat (last-sync timestamp).
-   A `/brain` command reports sync ages; if a mirror is stale beyond threshold, answers that
-   used it carry a one-line warning. A silently stale brain confidently answering from old
-   memories is the worst failure mode this system has.
-4. **Deterministic, date-keyed file names** (L3) — `brain/dayos/2026-07-12.md`. Re-running a
-   sync overwrites the same file; duplicates are impossible rather than detected.
-5. **IST everywhere** (L4 + contract invariant 2). String-comparable IST dates are what make
-   cheap incremental pulls work. `memory.py` already does this; the sync job follows.
-6. **Plumbing is free; thinking costs money.** Sync jobs make zero LLM calls. Tokens are
-   spent only on digests and answers, inside the existing `DAILY_CAP_USD`.
-7. **Every source earns its place through a gate** (§7). No speculative pipelines.
-8. **Never fork the playbook — pull it** (playbook/README rule). The brain holds a git
-   checkout, not a copy that rots.
+Three things make this safe and flexible:
 
-## 4. Memory layout (proposed)
+- **Firestore stays the source of truth for DayOS data.** The VPS mirror is
+  derived and disposable — delete `memory/dayos/` and the next sync rebuilds
+  it identically. Losing the server loses no data.
+- **The files are already Obsidian-compatible.** Digests are plain markdown
+  with `#tags`; point Obsidian at a copy of `memory/dayos/` and it just works
+  as a vault. Nothing to convert later.
+- **A human-browsable mirror is a bolt-on, not a decision we owe now.** When
+  wanted: a one-line cron (`rclone` to Google Drive, or a nightly push to a
+  private GitHub repo) exports the whole brain for browsing/backup. Deferred
+  until asked for — it adds a place for things to silently diverge, so it
+  should exist only once there's a real use.
+
+What we deliberately did **not** do: store the canonical brain *in* Google
+Drive or an Obsidian sync service. That would put a third-party API between
+the agent and its own memory (slower, rate-limited, new auth to break) and
+buy nothing — the phone already has DayOS itself as the beautiful view of
+this data.
+
+## How the DayOS integration works
 
 ```
-memory/
-  profile.md              # identity + durable facts (exists)
-  sessions/               # bot's own conversation logs (exists)
-  usage/                  # spend tracking (exists)
-  brain/
-    _status.json          # heartbeat: {source: last_sync_iso} — read by /brain
-    dayos/
-      days/2026-07-12.md  # one file per day: blocks, journal, captures, DFT, ratings, EOD
-      weeks/2026-W28.md   # weekly review + rollup
-      months/2026-07.md   # monthly review
-      learning.md         # learning entries (append-ordered)
-      projects/<slug>.md  # per-project sessions + project notes
-    playbook/             # read-only git checkout: time-tracker/playbook + LEARNINGS.md
-    digests/              # bot-AUTHORED distillations — the only writable brain lane
+DayOS app (phone/laptop)
+   └─ writes → Firebase Firestore  (source of truth, already exists)
+                   │  read-only service account, REST
+                   ▼
+   dayos_sync.py on the VPS  (systemd timer: every 2h; full re-pull daily;
+                   │           /sync in Telegram forces it)
+                   ▼
+   memory/dayos/
+     raw/*.json          exact Firestore mirror (rebuild source)
+     days/2026-07-03.md  one digest per day: timeline w/ hours by category,
+                         journal, captures, sessions, learning, EOD, ratings
+     weeks/<sunday>.md   weekly rollup + his Weekly Review + AI summary
+     months/YYYY-MM.md   monthly rollup + Monthly Review
+     projects/<slug>.md  per-project: sessions, notes, learning, hours
+     learning.md         full learning log
+     index.md            overview the bot can skim
+     sync_status.json    last success / last error — powers staleness warnings
+                   │
+                   ▼
+   bot.py tools: search_dayos · dayos_day · dayos_period · dayos_project
+   + a compact "today + yesterday" snapshot in every system prompt
 ```
 
-Context loading: today + yesterday's day-files ride along by default (mirrors the existing
-2-day session-notes window); everything older is reached by a grep/file-read tool on demand.
-No embeddings — settled decision; revisit only after naming three real queries grep failed.
+Key decisions (and why):
 
-## 5. Roadmap — ranked phases with timelines
+- **Sync to files rather than query Firestore live.** Answers are instant and
+  free at question time; the bot keeps working through Firebase outages; and
+  it keeps the whole memory architecture one thing (files) instead of two.
+- **Same auth pattern DayOS already uses.** `dayos_client.py` mirrors
+  `time-tracker/api/cron-reminders.mjs`: sign a service-account JWT, call the
+  Firestore REST API. No heavy Firebase SDK; two small libraries; every call
+  is inspectable HTTPS.
+- **Digests + raw, both.** Digests are what the model reads (organized,
+  token-efficient, greppable). Raw JSON means a digest-format improvement
+  next month is a code change + rebuild, not a re-download.
+- **Search semantics copied from DayOS itself** so results match his
+  intuition: `#win` matches the exact tag only (not `#winner`); any other
+  query is case-insensitive AND over all words.
+- **Soft-deleted entries are excluded** everywhere, matching what the DayOS
+  UI shows. Hard-deletes converge within a day via the daily full re-pull.
+- **Voice notes and attachments sync as titles/filenames** (searchable
+  pointers). No transcription — he uses an external tool for that; if
+  transcripts ever land in DayOS as text, they flow through automatically.
 
-| # | Phase | When | Effort | Why this position |
-|---|---|---|---|---|
-| 0 | **Deploy the mouth** + brief/tier decisions | this week | ~30 min founder + 1 session | Everything downstream is invisible without a live bot. Hard blocker, founder-owned. |
-| 1 | **DayOS mirror** (`dayos_sync.py`) | week 1–2 | 1–2 sessions | Richest structured source; contract already written; the benchmark feature. |
-| 2 | **Principles layer** (playbook + LEARNINGS via git) | week 2–3 | 1 session | Cheapest source, outsized value: turns a diary-reader into a coach that quotes the founder's own rules. |
-| 3 | **Distillation + retrieval quality** | week 3–4 | 1–2 sessions | Digests + query-time retrieval tuning; only meaningful once real data flows. |
-| 4 | **Proactive loops** | week 4–6 | 1–2 sessions | Morning brief / evening nudge / Friday synthesis via Telegram. Last, because proactive + wrong = uninstalled. |
-| 5 | **Widen sources by gate** | month 2+ | on demand | Google Drive notes (original Phase 2), other repos' handoffs, other apps' data — each through §7's gate. |
+## The silent-failure question (Rule 4), answered
 
-### Phase 0 — deploy + decide (blocker)
-- Founder: Hetzner signup, BotFather token, separate API key (`deploy/DEPLOY.md`).
-- Session: run deploy, verify the Phase-1 benchmark (daily use, facts persist across days).
-- Founder + session: fill `playbook/templates/BUILD_BRIEF.md` for the second brain
-  (10 minutes, conversational) and settle the tier (⚖️ §8).
-- **Done means:** bot answers on his phone; a fact told today is known tomorrow; `/spend` works.
+*"If this goes wrong silently, how would he ever find out?"*
 
-### Phase 1 — DayOS mirror (smallest slice first)
-- `dayos_sync.py` exactly per the contract: service-account JWT → Firestore REST,
-  recent-window pull every ~2h + full re-pull daily, systemd timer on the same VPS.
-- Slice 1: **days/ only, last 7 days** — prove the pipe end-to-end. Then widen to weeks/
-  months/learning/projects.
-- Heartbeat + fail-loud from the first commit, not retrofitted. `/sync` command for a manual
-  pull ("I just logged something, refresh").
-- **Done means:** "what did I do yesterday?" and "what's pending on <project>?" answered
-  correctly from real data — and with the network deliberately cut, the bot *says* its
-  memory is stale instead of silently answering from old files.
+- Sync failure → recorded in `sync_status.json`; **every** DayOS tool result
+  and the system-prompt snapshot then carries a loud `WARNING: last sync
+  FAILED / data is N days stale` line, so the agent itself tells him and
+  suggests `/sync`. Also visible in `journalctl -u dayos-sync`.
+- Not-yet-configured → sync exits cleanly with a "not configured" note (no
+  fake red alarms before the key exists); the bot's tools simply don't appear.
+- Bad key / wrong project / multiple users → explicit config errors with the
+  fix in the message (`DayosConfigError`), exit code 2.
 
-### Phase 2 — principles layer
-- Read-only clone of `instatank/time-tracker` on the VPS; `brain/playbook/` points at
-  `playbook/` + `LEARNINGS.md`; refreshed by the same timer (`git pull`).
-- Later: other repos' `LEARNINGS.md` as they earn it.
-- **Done means:** "what's my rule about renames?" quotes L5; "what's this week's technique?"
-  reads CURRICULUM correctly.
+## Cost & safety
 
-### Phase 3 — distillation + retrieval
-- Weekly digest: one scheduled Sonnet call (cents) writes `digests/2026-W28.md` — patterns,
-  deltas, open loops. Digests are the bot's opinion and labeled as such.
-- Retrieval order per question: today/yesterday in context → grep on demand → digests for
-  month-scale questions. Measure context size; keep answers inside the 1000-token cap.
-- **Done means:** "how did the last month go?" gets a grounded answer without blowing
-  context or budget.
+- **Anthropic cost:** tool results are capped (≈3.5k chars ≈ 900 tokens);
+  the ambient snapshot ≈ 600 tokens. Even heavy DayOS use stays a few cents
+  per day on Haiku, inside the existing `DAILY_CAP_USD` guard, which is
+  enforced regardless.
+- **Firestore cost:** reads only. Recent-window sync (12×/day) + daily full
+  re-pull ≈ well under the 50k/day free tier even at multi-year data scale.
+  $0.
+- **Safety:** the service account is used exclusively for reads by design of
+  the code we control; the agent has no write path to DayOS, so it cannot
+  corrupt or duplicate his data. The key file lives only on the VPS
+  (`chmod 600`, gitignored).
+- **Schema drift:** the Firestore schema is documented as a contract in
+  `time-tracker/docs/second-brain-integration.md`; DayOS schema changes are
+  supposed to update that doc (it's in DayOS's sync checklist). Unknown
+  fields here are ignored, unknown review fields still render generically —
+  drift degrades gracefully instead of breaking.
 
-### Phase 4 — proactive loops (trust must precede this)
-- Morning brief (DFT, today's default blocks, pending tasks), evening nudge (journal
-  unfilled by ~10pm), Friday weekly-synthesis delivery — LEARNING_METHOD §5 arriving *at*
-  the founder instead of waiting to be pasted (his own push-notification lesson, applied
-  to himself). Haiku-priced, count-capped, one-command mutable (`/quiet`).
-- **Done means:** the Friday summary shows up unprompted and he acts on it (CURRICULUM
-  item 10's own test).
+## What still needs the owner (in order)
 
-### Phase 5 — new sources, case-by-case
-Ranked candidates when the time comes: **Cadence** (workouts pair with DayOS energy/ratings)
-> **BillBud** (money questions are plausible weekly asks) > **TradeGenie** (trading rules —
-`profile.md` may be enough) > SignalDesk / Meal-Planner (low) > **PartySpark: never**
-(other people's data — see §6).
+1. **Deploy Phase 1** (unchanged prerequisite): Hetzner VPS + BotFather token
+   + Anthropic API key → `deploy/DEPLOY.md` steps 1–5.
+2. **The Firebase service-account key** for the DayOS project: Firebase
+   console → Project settings → Service accounts → *Generate new private
+   key* → follow `deploy/DEPLOY.md` step 7. (Generate a fresh key rather
+   than reusing Vercel's — same access, but each can be revoked without
+   breaking the other.)
+3. Nothing else. The user id auto-detects; the timer installs itself via
+   `setup_vps.sh`; `/sync` handles refreshes from the phone.
 
-## 6. Deliberately excluded (ranked by how firmly)
+## Verification checklist (after deploy)
 
-1. **Other people's data** (PartySpark users, anything multi-user). The brain is one
-   person's life. Hard line, not a phase.
-2. **Write access to any product's data.** Read-only forever; the bot's writable world is
-   `memory/` only (systemd hardening already enforces this).
-3. **Voice/photo binaries.** Contract already excludes them — titles/filenames as searchable
-   pointers only. Transcription stays in the founder's external tool → DayOS text.
-4. **Source code of the repos.** The brain wants decisions, lessons, and state — LEARNINGS,
-   handoffs, and docs carry that; `index.html` does not.
-5. **Vector DB / embeddings / Mem0.** Settled decision. Files + grep at personal scale;
-   the founder can open his own brain in a text editor and read it — that's a feature.
-6. **Real-time sync.** A diary tolerates 2h staleness; live listeners buy complexity, not
-   value. `/sync` covers the "just logged it" case.
-7. **Dashboards / web UI.** Original Phase 3 stance stands: only when asked. Telegram is
-   the interface.
-8. **Full chat-history context.** 2-day window + digests. History is grep-able, not
-   context-resident.
+1. `sudo -u agent venv/bin/python dayos_sync.py --full` → prints per-collection
+   counts, exit 0; `memory/dayos/days/` contains one file per logged day.
+2. Ask the bot *"what did I do yesterday?"* → answer matches DayOS's Today
+   view for yesterday.
+3. Ask *"how was my week?"* → numbers match the Trends → week view.
+4. Log a new block in DayOS, `/sync`, ask again → the new block appears.
+5. Stop the timer for a day (or break the key), ask a DayOS question → the
+   bot itself warns the data is stale. Then fix and confirm the warning clears.
 
-## 7. The gate for any new source (print this, use it every time)
+## Roadmap after this
 
-1. **The weekly-use test:** name a question the founder would actually ask the bot about
-   this data in a normal week. Can't name one → doesn't enter.
-2. **A contract doc** in the producer repo (the `second-brain-integration.md` pattern):
-   collections/fields/invariants, updated in the same commit as any schema change.
-3. **Read-only credentials**, a heartbeat entry, deterministic file naming.
-4. **One source per session** (Rule 1) — never two pipelines in one change.
+Tracked as a living backlog in **`docs/BACKLOG.md`** — read that for the full
+list of planned integrations (Drive notes, WhatsApp chat history, trading
+journals, ...), their status, and shared plumbing across them. Two
+standing principles that apply to all of them, not repeated per-entry there:
 
-## 8. ⚖️ Founder decision points
-
-1. **Tier.** Options: **(a)** promote instatank42 to Tier-1 flagship for ~6 weeks,
-   temporarily demoting PartySpark to Tier 2 (max-2-flagships rule stands) — honest if the
-   second brain is now the main build focus, as this initiative implies; **(b)** Tier 3
-   "special" like UoT — its own rules, no flagship displacement, but then CURRICULUM
-   exercises don't run here. Recommendation: **(a)**, revisited at the first monthly review.
-2. **BUILD_BRIEF.** Ten minutes, next session, conversational. This doc pre-fills most of it.
-3. **Proactive cadence** (Phase 4): morning + evening + Friday, or Friday only to start?
-   Recommendation: Friday-only first; earn the daily slots.
-4. **Which track this trains** (for the brief): S — first real producer/consumer pipeline
-   across two systems (the whiteboard-able system CURRICULUM item 12 wants); O — first VPS,
-   systemd, timers, no Vercel guardrails; D — context engineering: deciding what memory
-   enters the model, when, at what cost.
-
-## 9. Don'ts (the failure modes this plan is designed against)
-
-- Don't build any brain code before the bot is deployed and the benchmark passes.
-- Don't re-litigate settled architecture (files over vector DB, model routing, hosting).
-- Don't give the sync job write scope "temporarily."
-- Don't copy playbook files into this repo — pull them.
-- Don't let a sync failure be quiet — no heartbeat, no ship (Rule 4).
-- Don't start proactive messaging before retrieval is trusted — annoying kills the habit
-  faster than useless does.
-- Don't add a source without its contract doc and gate answers (§7).
-- Don't let digests edit mirrors — the bot's opinions never overwrite the founder's data.
+- **Proactive use** — morning/evening briefings composed from bank snapshots
+  (Phase 3 "automations, only when asked") is a cross-cutting feature to add
+  once 2+ banks exist, not tied to any one integration.
+- **Semantic search / embeddings** — only if plain search demonstrably fails
+  on real questions, for any bank. The bar stays where Phase 1 set it.

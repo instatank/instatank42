@@ -8,6 +8,10 @@ locked to your Telegram ID.
 - You message the bot on Telegram (voice via Wispr Flow dictation works — it's just text to the bot).
 - Cheap fast model (Haiku) answers routine messages; the smarter model (Sonnet)
   kicks in automatically for longer/planning-type messages.
+- **Web search built in:** for anything time-sensitive (news, prices, current
+  events) the agent searches the web via Anthropic's server-side search tool
+  and cites what it finds. Capped at 3 searches per message (~1¢ each, inside
+  the daily budget cap).
 - Memory is plain files in `memory/`:
   - `profile.md` — who you are. Edit it freely; the agent reads it every turn.
     The agent also saves durable facts here on its own.
@@ -17,12 +21,19 @@ locked to your Telegram ID.
 - Hard cost guards: per-reply output cap, and a daily spend ceiling
   (`DAILY_CAP_USD`, default $0.50/day ≈ $15/month worst case). When hit, the
   bot politely refuses until midnight IST.
+- **DayOS second brain (optional):** `dayos_sync.py` mirrors your DayOS data
+  (journals, activity blocks, notes, project sessions, learning, trends) from
+  Firestore into `memory/dayos/` as organized markdown, and the agent can
+  search and read it to answer questions like "what did I do last Tuesday" or
+  "how was my week". Read-only — the agent never writes to DayOS. Setup:
+  `deploy/DEPLOY.md` step 7; architecture: `docs/SECOND_BRAIN.md`.
 
 ## Commands
 
 - `/start` — hello (also shows your numeric Telegram ID if you're not authorized yet)
 - `/remember <fact>` — manually save a fact to your profile
 - `/spend` — today's and this month's cost
+- `/sync` — refresh DayOS data now (`/sync full` re-pulls everything)
 
 ## Setup
 
@@ -38,4 +49,9 @@ Run locally: `python3 -m venv venv && venv/bin/pip install -r requirements.txt &
 
 ## Tests
 
-`venv/bin/python tests/test_smoke.py` — offline, no API key needed.
+Offline, no API key or network needed:
+
+```
+venv/bin/python tests/test_smoke.py
+venv/bin/python tests/test_dayos.py
+```

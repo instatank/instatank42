@@ -146,7 +146,69 @@ cd /opt/instatank-agent && git pull && systemctl restart telegram-agent
 ```
 *Downloads the latest code and restarts the bot.*
 
-## 7. Troubleshooting
+## 7. Connect DayOS (the second brain) — optional, do this after step 5 works
+
+This gives the agent read access to everything you log in DayOS — journals,
+activity blocks, notes, project sessions, learning entries, trends. It syncs
+automatically every 2 hours (plus a full refresh daily), and you can force a
+refresh anytime by messaging the bot `/sync`.
+
+You need one thing: the **Firebase service-account key** for the DayOS
+project (a small JSON file that acts as a server-side password to your
+DayOS database — the same kind of key DayOS itself uses on Vercel).
+
+1. Go to https://console.firebase.google.com → open your DayOS project →
+   ⚙️ **Project settings** → **Service accounts** tab → click
+   **Generate new private key**. A `.json` file downloads.
+2. Copy it to the server. On your own computer, run (replace the IP and the
+   filename with yours):
+
+```
+scp ~/Downloads/your-downloaded-key.json root@203.0.113.42:/opt/instatank-agent/.firebase-sa.json
+```
+*Copies the key file from your computer onto the server.*
+
+3. On the server, lock it down and point the bot at it:
+
+```
+chown agent:agent /opt/instatank-agent/.firebase-sa.json && chmod 600 /opt/instatank-agent/.firebase-sa.json
+```
+*Makes the key readable only by the bot's own user account.*
+
+```
+nano /opt/instatank-agent/.env
+```
+Add this line (it's already in the file if you copied `.env.example`):
+
+```
+FIREBASE_SERVICE_ACCOUNT_FILE=/opt/instatank-agent/.firebase-sa.json
+```
+
+4. Run the first sync and restart the bot:
+
+```
+sudo -u agent /opt/instatank-agent/venv/bin/python /opt/instatank-agent/dayos_sync.py --full
+```
+*Pulls your whole DayOS history into the agent's memory (takes a few seconds).*
+
+```
+systemctl restart telegram-agent && systemctl start dayos-sync.timer
+```
+*Restarts the bot so it sees the new data, and turns on the every-2-hours auto-sync.*
+
+5. Test it: ask the bot something like *"what did I do yesterday?"* or
+   *"how was my week?"* — it should answer from your real DayOS data.
+   `/sync` in Telegram forces a refresh; `/sync full` re-pulls everything.
+
+**Notes:**
+- The agent only **reads** DayOS data. It never writes to your DayOS
+  database, so it cannot corrupt or duplicate anything there.
+- The key file is a secret. It never goes in git (`.gitignore` covers it),
+  only on the server.
+- Voice notes sync as their titles (the audio itself isn't transcribed —
+  you already use a separate transcription tool).
+
+## 8. Troubleshooting
 
 **The service won't start / status shows "failed":**
 
@@ -172,6 +234,22 @@ After editing the file, always restart:
 systemctl restart telegram-agent
 ```
 *Restarts the bot so it picks up your changes.*
+
+**DayOS data seems stale or `/sync` fails:**
+
+```
+journalctl -u dayos-sync -n 30
+```
+*Shows the last sync attempts and their error messages.*
+
+```
+sudo -u agent /opt/instatank-agent/venv/bin/python /opt/instatank-agent/dayos_sync.py --status
+```
+*Prints when the last successful sync ran and what it pulled.*
+
+Common causes: the key file path in `.env` is wrong, the key was generated
+in a different Firebase project than DayOS, or the file permissions block
+the `agent` user (fix with the `chown`/`chmod` line from step 7.3).
 
 **Still stuck?** Watch the live log (`journalctl -u telegram-agent -f`)
 while you message the bot — whatever it prints when your message arrives is
