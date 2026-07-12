@@ -23,6 +23,7 @@ embeddings — plain files and search, upgraded only if that demonstrably fails.
 | **DayOS** | `memory/dayos/` | **live** (2026-07) | Journals, activity blocks, captures/notes, project sessions, learning log, ratings, reviews — his whole logged life |
 | **Playbook** | `memory/playbook/` | **live** (2026-07-12) | Read-only git mirror of his cross-project rules, lessons, North Star, curriculum, LEARNINGS ledger (tools: `search_playbook`, `playbook_doc`) |
 | **Agent digests** | `memory/digests/` | **built** (2026-07-12) | AI-written weekly syntheses — the agent's own opinion lane; written Fridays (or `/digest`), never overwrites mirrors; read via `weekly_digest` |
+| **WhatsApp** | `memory/whatsapp/` | **built** (2026-07-12) | Manual chat-export snapshots, ingested via Telegram file upload with confirm-first buttons (tools: `search_whatsapp`, `whatsapp_chat`); each re-export replaces that chat's snapshot |
 | Drive notes | `memory/drive/` (future) | planned | His Google-Drive-synced notes, mirrored read-only the same way |
 | Spend | `memory/usage/*.json` | live (Phase 1) | Cost accounting (not model-visible) |
 
@@ -35,6 +36,13 @@ The pattern every future bank must follow (this is the contract):
    the mirror is old or the last sync failed. Silent staleness is the enemy.
 4. **Tools, not context-stuffing** — a compact ambient snapshot in the system
    prompt; everything else fetched on demand so cost stays capped.
+
+Manual-export banks (WhatsApp is the first) follow the same contract with one
+substitution: there is no sync process to go stale, so instead of timer-based
+staleness warnings, **every tool result carries each snapshot's coverage
+date** ("covers to 2026-06-30") — the equivalent loud defense against stale
+data passing as current. Ingest failures still ride the health banner via the
+same `sync_status.json` shape.
 
 ## Where the second brain is stored (the Obsidian / Google Drive question)
 

@@ -308,7 +308,29 @@ with `sudo` — it won't see `.env`; see the note in step 7.)
 - If the sync ever says "SYNC FAILED", the bot will also warn you itself the
   next time you ask a playbook question — run `/sync` after fixing.
 
-## 9. The Friday synthesis — automatic, nothing to configure
+## 9. Feed it WhatsApp conversations — optional, 2 minutes per chat
+
+No server setup at all for this one — if the bot is running, it already works.
+
+1. On your phone, open WhatsApp → the chat you want the agent to know →
+   tap the name at the top → **Export chat** → **Without media**.
+2. Share the exported file (`.txt`, or the `.zip` iPhones make) straight to
+   your bot on Telegram, like sending any file.
+3. The bot replies with what it detected — which chat, how many messages,
+   what date range — and two buttons. Press **Add to brain** (or **Discard**
+   if it's not what you meant to send). Nothing is saved until you press it.
+4. Test it: *"what did we agree with <name> about <topic>?"*
+
+**Notes:**
+- This is a **snapshot**, not a live link — the agent only knows the chat up
+  to the moment you exported it (it tells you the coverage date when it
+  answers). Re-export the same chat any time to refresh; the new export
+  replaces the old one automatically.
+- Exports include the other person's messages too — be choosy about which
+  chats you feed in.
+- Media (photos/voice notes) is never ingested; export *without* media.
+
+## 10. The Friday synthesis — automatic, nothing to configure
 
 Once steps 4–7 are done, every **Friday at 6pm IST** the agent writes a short
 synthesis of your week (numbers vs last week, patterns, open loops, one
@@ -322,7 +344,7 @@ week and counts against the same daily budget cap as everything else.
 - If a Friday run fails, the agent messages you the error itself (and skips
   politely if the day's budget cap is already spent).
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 **The service won't start / status shows "failed":**
 

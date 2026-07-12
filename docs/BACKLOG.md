@@ -31,14 +31,15 @@ Infrastructure that more than one integration needs. Build once, reuse.
    a `sync_status.json` with loud staleness warnings, search/day/period-style
    read tools. The default shape for any *recurring, syncable* data source
    (has an API, a database, or a feed).
-2. **Telegram file-drop ingestion** (not yet built) — the bot accepts a
-   document upload from Ankit, saves it, runs a source-specific parser, and
-   merges the result into a `memory/<bank>/` directory. The default shape for
-   any *manual export* data source (no API, just periodic file dumps).
-   Needed by: WhatsApp exports now; likely trading journal exports too if
-   they turn out to be file-based (CSV/broker statement/PDF) — worth
-   building the generic upload→parse→merge pipeline once, then adding a thin
-   per-source parser for each.
+2. **Telegram file-drop ingestion** — ✅ **Built** (2026-07-12, `ingest.py`):
+   the bot accepts a document upload (.txt or .zip, 8 MB cap), asks every
+   registered parser to recognize it, shows a preview, and only writes to the
+   brain after an explicit "Add to brain" button press (confirm-first — the
+   open question below, resolved). The default shape for any *manual export*
+   data source (no API, just periodic file dumps). Adding a future source
+   (trading-journal CSVs, broker statements) = one new parser module with the
+   `PARSER` contract at the top of `ingest.py`, added to `ingest.PARSERS` —
+   the pipeline itself shouldn't need to change. First consumer: WhatsApp.
 3. **Cross-bank search** — one tool that greps every memory bank at once.
    Trivial once 2+ banks exist; deferred until then to keep the tool list
    small (noted in `docs/SECOND_BRAIN.md`).
@@ -70,7 +71,7 @@ tool. Never fork a copy — pull it (playbook README rule).
 fine-grained GitHub token (Contents:read on time-tracker only) + two `.env`
 lines + first sync. Walkthrough: `deploy/DEPLOY.md` step 8.
 
-### WhatsApp chat history — 📋 Planned
+### WhatsApp chat history — 🔨 Code built + tested (2026-07-12); awaiting VPS `git pull` + first export
 
 **What:** a searchable archive of important WhatsApp conversations, so the
 agent can answer "what did we agree with X about Y" from real chat history.
@@ -89,20 +90,27 @@ recent).
 - *WhatsApp Business API* — only captures messages through a business
   number going forward; can't reach personal chat history. Doesn't fit.
 
-**Needs:**
-- Building block #2 (Telegram file-drop ingestion) — not yet built.
-- A WhatsApp export parser: the exported `.txt` format is a fixed, well-known
-  line shape (`[DD/MM/YY, HH:MM:SS] Sender: message`, multi-line messages
-  continue without a new timestamp) — should be a small, mostly-mechanical
-  parser once ingestion exists.
-- Per-contact/group memory files under `memory/whatsapp/`, split by
-  month like DayOS's `days/`, reusing the same search tool shape.
+**Built (2026-07-12, offline-tested):**
+- Building block #2 (`ingest.py`) — see above.
+- `whatsapp_ingest.py` — parser (both Android `12/06/26, 9:15 pm - X: msg`
+  and iOS `[12/06/26, 21:15:33] X: msg` dialects, multi-line messages,
+  system lines, day-first dates unless the file proves month-first) + bank
+  writer: `memory/whatsapp/chats/<chat>/YYYY-MM.md`, one paragraph per day,
+  raw export kept under `memory/whatsapp/raw/`. Each ingest is a **snapshot
+  that fully replaces that chat's earlier one** — no merging, no dedup;
+  re-export whenever a refresh is wanted.
+- `whatsapp_store.py` + bot tools `search_whatsapp` / `whatsapp_chat` —
+  every result carries each chat's coverage line ("covers to <date>") so a
+  June export can never pass as live data; ingest failures ride the health
+  banner like every other bank.
 
-**Open question (resolve before building):** should the bot auto-ingest any
-`.txt` file it receives as a WhatsApp export, or confirm first ("looks like
-a WhatsApp export for 'X' — add it to the brain?")? Leaning toward
-confirm-first — safer default, and it's the first file-upload feature so
-worth being conservative.
+**Still needs:** the founder pulls the code onto the VPS (`git pull` +
+restart, no new config), then WhatsApp → chat → Export chat → *Without
+media* → share the .txt/.zip to the bot → press "Add to brain".
+
+**Open question — resolved (2026-07-12):** confirm-first, as leaned. The bot
+never ingests silently; it previews what it detected and waits for a button
+press.
 
 **Privacy note:** exports contain the other party's messages too. Be
 selective about which chats get fed in.
@@ -126,10 +134,10 @@ this up):
 - One sample export/file to design the parser against.
 
 **Likely shared plumbing:** if the journal turns out to be file-based
-exports (CSV, broker statement PDF, spreadsheet download), this probably
-reuses building block #2 (Telegram file-drop ingestion) — same pattern as
-WhatsApp, different parser. Worth building the ingestion pipeline with both
-in mind rather than bespoke to WhatsApp only.
+exports (CSV, broker statement PDF, spreadsheet download), this reuses
+building block #2 (Telegram file-drop ingestion) — now built (2026-07-12)
+with exactly this in mind: a trading-journal source is one new parser
+module implementing the `PARSER` contract, nothing more.
 
 ### Google Drive notes — 📋 Planned (original Phase 2 scope)
 

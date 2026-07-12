@@ -20,7 +20,7 @@ what was actually built and deployed.*
 | 2 | Principles layer — playbook + LEARNINGS | ✅ **Live** (founder-verified 2026-07-12) | Bot quotes actual playbook rules. |
 | 3 | Distillation — AI weekly synthesis | 🔨 **Code built + tested** (2026-07-12) | `digests.py` + `weekly_digest` tool + `/digest`. Live after server `git pull` + `setup_vps.sh` re-run. |
 | 4 | Proactive loops — Friday delivery | 🔨 **Code built + tested** (2026-07-12) | `weekly-digest.timer`, Fri 18:00 IST, failures messaged to Telegram. Friday-only per founder decision; morning/evening nudges stay unbuilt until Friday earns it. |
-| 5 | New sources, by gate | 🔁 Ongoing | Tracked per-source in `BACKLOG.md`; gate below. |
+| 5 | New sources, by gate | 🔁 Ongoing | Tracked per-source in `BACKLOG.md`; gate below. First source through: **WhatsApp chat history** — 🔨 code built + tested 2026-07-12 (plus the shared file-drop ingestion pipeline, building block #2). Live after VPS `git pull` + first export upload. |
 
 ### Phase 1 residual — the staleness drill
 
@@ -122,6 +122,11 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 - [ ] Founder: pull Phases 3+4 onto the server (`git pull` + re-run
       `setup_vps.sh` to install the new timer), then send `/digest` to see
       the first synthesis.
+- [ ] Founder: after the same `git pull` + restart, try the first WhatsApp
+      ingest — WhatsApp → chat → Export chat → **Without media** → share the
+      file to the bot → press "Add to brain" (walkthrough:
+      `deploy/DEPLOY.md` step 9). Phase 5's first source goes live with that
+      button press.
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).

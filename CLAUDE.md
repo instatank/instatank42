@@ -34,8 +34,19 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   read tool `weekly_digest`. Goes live on the VPS after `git pull` + re-running
   `setup_vps.sh` (installs the new timer). ~$0.02/week on Sonnet, inside the
   daily cap; failures are messaged to the founder ON Telegram (Rule 4).
+- **WhatsApp bank + file-drop ingestion (Phase 5, first source) code complete
+  + tested offline** (2026-07-12): `ingest.py` is the generic Telegram
+  upload→detect→confirm→ingest pipeline (backlog building block #2;
+  confirm-first via inline buttons — nothing enters the brain silently);
+  `whatsapp_ingest.py` parses both export dialects and writes snapshots to
+  `memory/whatsapp/chats/<chat>/YYYY-MM.md` (re-export replaces, never
+  merges); bot tools `search_whatsapp` + `whatsapp_chat`, every result
+  carrying the snapshot's coverage date. Live after VPS `git pull` + restart
+  (no new config, no new timer); the founder then uploads his first export
+  (`deploy/DEPLOY.md` step 9).
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
-  `tests/test_dayos.py`, `tests/test_playbook.py`, and `tests/test_digests.py`).
+  `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
+  and `tests/test_whatsapp.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -86,6 +97,13 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `playbook_doc`. Config: `PLAYBOOK_REPO_URL` (+ `PLAYBOOK_REPO_TOKEN` for a
   private repo — scrubbed from all output/status, never stored in the git
   remote on disk).
+- **WhatsApp bank**: manual chat exports only (WhatsApp → Export chat →
+  Without media), uploaded to the bot as a Telegram file and routed through
+  `ingest.py` — the generic file-drop pipeline (confirm-first inline buttons;
+  8 MB cap; new sources = one parser module). Each ingest is a snapshot that
+  REPLACES that chat's earlier one; every read carries the coverage date.
+  Live/unofficial WhatsApp sync was rejected 2026-07-07 (ToS ban risk) —
+  don't revisit.
 
 ## Lessons / gotchas
 
@@ -131,9 +149,17 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `digests.py` — weekly synthesis: build input from the DayOS mirror, one
   Sonnet call, write `memory/digests/<week>.md`, Telegram delivery, CLI
   (`--send/--week/--status`)
+- `ingest.py` — generic Telegram file-drop pipeline (building block #2):
+  parser registry + zip/text extraction + size cap; a new file-based source
+  is one parser module added to `PARSERS`
+- `whatsapp_ingest.py` — WhatsApp export parser (Android + iOS dialects) +
+  snapshot writer into `memory/whatsapp/`
+- `whatsapp_store.py` — read side: search/chat reads, coverage notes,
+  ingest-failure warnings, prompt note
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
-  `tests/test_digests.py` — offline tests, no network (playbook sync tests
-  clone a local file:// repo; digest tests fake the Anthropic client)
+  `tests/test_digests.py`, `tests/test_whatsapp.py` — offline tests, no
+  network (playbook sync tests clone a local file:// repo; digest tests fake
+  the Anthropic client)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
 - `docs/ROADMAP.md` — phased second-brain roadmap + founder decision log
 - `docs/BACKLOG.md` — living tracker for planned integrations (WhatsApp,

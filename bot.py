@@ -13,9 +13,10 @@ import time
 from collections import deque
 
 import anthropic
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -25,8 +26,10 @@ from telegram.ext import (
 import budget
 import dayos_store
 import digests
+import ingest
 import memory
 import playbook_store
+import whatsapp_store
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -210,6 +213,47 @@ PLAYBOOK_TOOLS = [
 ]
 
 
+# WhatsApp memory-bank tools — read the snapshot files whatsapp_ingest.py
+# writes when the founder uploads a chat export (no live sync by design).
+WHATSAPP_TOOLS = [
+    {
+        "name": "search_whatsapp",
+        "description": (
+            "Search the user's ingested WhatsApp conversations (manual chat-export "
+            "snapshots). Use for 'what did we discuss/agree/decide with X about Y'. "
+            "A single '#tag' query matches that exact tag only; any other query "
+            "requires ALL words. Results are labeled by chat and day, newest first. "
+            "Data ends at each chat's snapshot date — never treat it as live."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search words, or one '#tag'."},
+                "chat": {"type": "string",
+                         "description": "Optional: limit to one chat, by name."},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "whatsapp_chat",
+        "description": (
+            "Read one ingested WhatsApp chat's messages, one month at a time "
+            "(most recent month by default). Use after search_whatsapp when the "
+            "surrounding conversation matters."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Chat name, e.g. the contact or group."},
+                "month": {"type": "string", "description": "Optional YYYY-MM."},
+            },
+            "required": ["name"],
+        },
+    },
+]
+
+
 # Weekly-synthesis read tool — reads stored digests only; generation (which
 # costs tokens) happens solely via /digest or the Friday timer.
 DIGEST_TOOL = {
@@ -242,6 +286,8 @@ def current_tools() -> list:
         tools += DAYOS_TOOLS
     if playbook_store.has_data() or os.environ.get("PLAYBOOK_REPO_URL"):
         tools += PLAYBOOK_TOOLS
+    if whatsapp_store.has_data():
+        tools += WHATSAPP_TOOLS
     if digests.has_any():
         tools.append(DIGEST_TOOL)
     return tools
@@ -267,6 +313,10 @@ def handle_tool(name: str, args: dict) -> str:
             return playbook_store.search(args.get("query", ""))
         if name == "playbook_doc":
             return playbook_store.doc(args.get("name", ""))
+        if name == "search_whatsapp":
+            return whatsapp_store.search(args.get("query", ""), args.get("chat", ""))
+        if name == "whatsapp_chat":
+            return whatsapp_store.chat(args.get("name", ""), args.get("month", ""))
         if name == "weekly_digest":
             return digests.load(args.get("period", "this week"))
         return f"Unknown tool: {name}"
@@ -279,7 +329,8 @@ def health_banner() -> str:
     remembering to mention them (playbook L11: machine-enforced, not
     memory-enforced). Verified necessary: the model happily answered from a
     broken bank's mirror without relaying the warning it was given."""
-    notes = [n for n in (dayos_store.staleness_note(), playbook_store.staleness_note()) if n]
+    notes = [n for n in (dayos_store.staleness_note(), playbook_store.staleness_note(),
+                         whatsapp_store.staleness_note()) if n]
     return "\n".join(notes)
 
 
@@ -289,6 +340,9 @@ client = anthropic.Anthropic()
 histories: dict[int, list] = {}
 # user_id -> deque of recent message timestamps (rate limiting)
 recent_msgs: dict[int, deque] = {}
+# chat_id -> a detected-but-unconfirmed file upload (confirm-first ingestion;
+# in-memory only — a bot restart drops it and the file just gets re-sent)
+pending_ingests: dict[int, dict] = {}
 
 COMPLEX_HINTS = (
     "plan", "analyze", "analyse", "strategy", "strategic", "tradeoff",
@@ -324,6 +378,9 @@ def build_system() -> list:
     pb_note = playbook_store.prompt_note()
     if pb_note:
         parts.append({"type": "text", "text": pb_note})
+    wa_note = whatsapp_store.prompt_note()
+    if wa_note:
+        parts.append({"type": "text", "text": wa_note})
     return parts
 
 
@@ -423,6 +480,64 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     await send_reply(update, prefix + (reply or "(empty reply)"))
 
 
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """File-drop ingestion (building block #2): detect what an uploaded file
+    is, show a preview, and wait for an explicit button press before anything
+    touches the brain. Today that means WhatsApp chat exports (.txt/.zip)."""
+    if not authorized(update) or not update.message or not update.message.document:
+        return
+    doc = update.message.document
+    if doc.file_size and doc.file_size > ingest.MAX_FILE_BYTES:
+        await update.message.reply_text(
+            f"That file is {doc.file_size / 1e6:.1f} MB — over the "
+            f"{ingest.MAX_FILE_BYTES / 1e6:.0f} MB ingest cap. For WhatsApp, "
+            "export WITHOUT media and it'll be tiny.")
+        return
+    tg_file = await doc.get_file()
+    data = bytes(await tg_file.download_as_bytearray())
+    try:
+        filename, text = ingest.extract_text(doc.file_name or "upload", data)
+        parser, info = await asyncio.to_thread(ingest.detect, filename, text)
+    except ValueError as e:
+        await update.message.reply_text(f"Can't ingest that: {e}")
+        return
+    if parser is None:
+        await update.message.reply_text(info)
+        return
+    pending_ingests[update.effective_chat.id] = {
+        "parser": parser["name"], "filename": filename, "text": text,
+    }
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("Add to brain", callback_data="ingest:add"),
+        InlineKeyboardButton("Discard", callback_data="ingest:discard"),
+    ]])
+    await update.message.reply_text(info["preview"], reply_markup=keyboard)
+
+
+async def handle_ingest_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """The confirm/discard press for a pending upload."""
+    query = update.callback_query
+    if not query or not query.from_user or str(query.from_user.id) != ALLOWED_USER_ID:
+        return
+    await query.answer()
+    pending = pending_ingests.pop(query.message.chat_id, None) if query.message else None
+    if pending is None:
+        await query.edit_message_text("Nothing pending (the bot may have restarted) — send the file again.")
+        return
+    if query.data != "ingest:add":
+        await query.edit_message_text("Discarded — nothing was saved.")
+        return
+    await query.edit_message_text("Ingesting…")
+    try:
+        summary = await asyncio.to_thread(
+            ingest.run, pending["parser"], pending["filename"], pending["text"])
+    except Exception as e:  # already recorded to the bank's status by ingest.run
+        log.exception("Ingest failed")
+        await query.edit_message_text(f"Ingest FAILED: {e}")
+        return
+    await query.edit_message_text(summary)
+
+
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
     if not authorized(update):
@@ -435,7 +550,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Hi — I'm your agent. Just talk to me. /remember saves a fact, "
         "/spend shows today's cost, /sync refreshes the memory banks, "
-        "/digest writes this week's synthesis now."
+        "/digest writes this week's synthesis now. Send me a WhatsApp chat "
+        "export (.txt or .zip, no media) to add that conversation to the brain."
     )
 
 
@@ -546,6 +662,8 @@ def main() -> None:
     app.add_handler(CommandHandler("sync", cmd_sync))
     app.add_handler(CommandHandler("digest", cmd_digest))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
+    app.add_handler(CallbackQueryHandler(handle_ingest_button, pattern=r"^ingest:"))
     log.info("Bot starting (models: %s / %s, daily cap $%.2f)", HAIKU, SONNET, budget.DAILY_CAP_USD)
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
