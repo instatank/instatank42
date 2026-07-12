@@ -1,0 +1,9 @@
+[Unit]
+Description=Friday-evening weekly synthesis (18:00 IST)
+
+[Timer]
+OnCalendar=Fri *-*-* 18:00:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

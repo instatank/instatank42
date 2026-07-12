@@ -71,11 +71,14 @@ echo "==> Installing systemd service..."
 cp "$APP_DIR/deploy/$SERVICE_NAME.service" /etc/systemd/system/
 cp "$APP_DIR/deploy/dayos-sync.service" /etc/systemd/system/
 cp "$APP_DIR/deploy/dayos-sync.timer" /etc/systemd/system/
+cp "$APP_DIR/deploy/weekly-digest.service" /etc/systemd/system/
+cp "$APP_DIR/deploy/weekly-digest.timer" /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
-# DayOS sync timer: harmless before the Firebase key is configured (the script
-# exits cleanly with a "not configured" note until then).
+# Sync + digest timers: harmless before configuration (each script exits
+# cleanly with a "not configured" note until its keys exist).
 systemctl enable --now dayos-sync.timer
+systemctl enable --now weekly-digest.timer
 
 # --- 7. Env file with secrets -------------------------------------------------
 

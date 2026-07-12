@@ -31,6 +31,10 @@ locked to your Telegram ID.
   git mirror of your written playbook (cross-project rules, lessons, North
   Star, curriculum, LEARNINGS ledger) in `memory/playbook/`, so the agent can
   quote your own rules back at you. Setup: `deploy/DEPLOY.md` step 8.
+- **Friday synthesis:** every Friday 6pm IST the agent writes a short
+  AI-authored digest of your week (patterns, deltas, open loops — its own
+  notes, saved in `memory/digests/`) and sends it to you on Telegram.
+  `/digest` makes one on demand; ~2¢ a week, inside the daily cap.
 
 ## Commands
 
@@ -38,6 +42,7 @@ locked to your Telegram ID.
 - `/remember <fact>` — manually save a fact to your profile
 - `/spend` — today's and this month's cost
 - `/sync` — refresh all memory banks now (`/sync full` re-pulls all DayOS history)
+- `/digest` — write and show this week's synthesis right now
 
 ## Setup
 
@@ -59,4 +64,5 @@ Offline, no API key or network needed:
 venv/bin/python tests/test_smoke.py
 venv/bin/python tests/test_dayos.py
 venv/bin/python tests/test_playbook.py
+venv/bin/python tests/test_digests.py
 ```

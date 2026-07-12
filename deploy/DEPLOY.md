@@ -308,7 +308,21 @@ with `sudo` — it won't see `.env`; see the note in step 7.)
 - If the sync ever says "SYNC FAILED", the bot will also warn you itself the
   next time you ask a playbook question — run `/sync` after fixing.
 
-## 9. Troubleshooting
+## 9. The Friday synthesis — automatic, nothing to configure
+
+Once steps 4–7 are done, every **Friday at 6pm IST** the agent writes a short
+synthesis of your week (numbers vs last week, patterns, open loops, one
+suggestion) and sends it to you on Telegram by itself. It costs about 2¢ a
+week and counts against the same daily budget cap as everything else.
+
+- Want one right now instead of waiting for Friday? Send **`/digest`** to the
+  bot.
+- Ask *"what did you make of my week?"* later — the agent can re-read its own
+  past syntheses.
+- If a Friday run fails, the agent messages you the error itself (and skips
+  politely if the day's budget cap is already spent).
+
+## 10. Troubleshooting
 
 **The service won't start / status shows "failed":**
 

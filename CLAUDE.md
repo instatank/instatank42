@@ -23,13 +23,19 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - **Read `docs/BACKLOG.md` every session** — the living tracker for planned
   memory-bank integrations (WhatsApp chat history, trading journals, Drive
   notes, playbook, ...), their status, and shared plumbing to club across them.
-- **Playbook memory bank (Phase 2) code complete + tested offline** (2026-07-12):
-  `playbook_sync.py` git-mirrors time-tracker's `playbook/` + `LEARNINGS.md`;
-  bot tools `search_playbook` + `playbook_doc`. NOT yet running on the VPS —
-  needs the 5-minute setup in `deploy/DEPLOY.md` step 8 (founder-owned:
-  fine-grained GitHub token + two .env lines).
+- **Playbook memory bank (Phase 2) LIVE** (founder-verified 2026-07-12): the
+  bot quotes actual playbook rules. `playbook_sync.py` git-mirrors
+  time-tracker's `playbook/` + `LEARNINGS.md`; bot tools `search_playbook` +
+  `playbook_doc`.
+- **Weekly synthesis (Phases 3+4) code complete + tested offline** (2026-07-12):
+  `digests.py` writes an AI-authored weekly distillation to `memory/digests/`
+  (agent's own lane, never overwrites mirrors) and delivers it via Telegram —
+  Friday 18:00 IST timer (`weekly-digest.timer`) + on-demand `/digest` +
+  read tool `weekly_digest`. Goes live on the VPS after `git pull` + re-running
+  `setup_vps.sh` (installs the new timer). ~$0.02/week on Sonnet, inside the
+  daily cap; failures are messaged to the founder ON Telegram (Rule 4).
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
-  `tests/test_dayos.py`, and `tests/test_playbook.py`).
+  `tests/test_dayos.py`, `tests/test_playbook.py`, and `tests/test_digests.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -122,12 +128,17 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `memory/playbook/` + `sync_status.json`
 - `playbook_store.py` — read side: search/doc lookup, staleness warnings,
   prompt note
-- `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py` —
-  offline tests, no network (playbook sync tests clone a local file:// repo)
+- `digests.py` — weekly synthesis: build input from the DayOS mirror, one
+  Sonnet call, write `memory/digests/<week>.md`, Telegram delivery, CLI
+  (`--send/--week/--status`)
+- `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
+  `tests/test_digests.py` — offline tests, no network (playbook sync tests
+  clone a local file:// repo; digest tests fake the Anthropic client)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
 - `docs/ROADMAP.md` — phased second-brain roadmap + founder decision log
 - `docs/BACKLOG.md` — living tracker for planned integrations (WhatsApp,
   trading journals, Drive notes, ...); read every session, update as things move
 - `BUILD_BRIEF.md` — the filled build brief for the second brain (playbook rule)
 - `deploy/` — `setup_vps.sh` (idempotent root script), `telegram-agent.service`,
-  `dayos-sync.service` + `.timer`, `DEPLOY.md` (non-technical walkthrough)
+  `dayos-sync.service` + `.timer`, `weekly-digest.service` + `.timer`,
+  `DEPLOY.md` (non-technical walkthrough)

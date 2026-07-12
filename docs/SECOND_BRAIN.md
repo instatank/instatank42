@@ -20,8 +20,10 @@ embeddings — plain files and search, upgraded only if that demonstrably fails.
 |---|---|---|---|
 | Profile + facts | `memory/profile.md` | live (Phase 1) | Who he is; durable facts the agent saves via `remember_fact` |
 | Conversation log | `memory/sessions/*.md` | live (Phase 1) | Dated log of every bot conversation; last 2 days fed as context |
-| **DayOS** | `memory/dayos/` | **built (this doc)** | Journals, activity blocks, captures/notes, project sessions, learning log, ratings, reviews — his whole logged life |
-| Drive notes | `memory/drive/` (future) | planned (Phase 2) | His Google-Drive-synced notes, mirrored read-only the same way |
+| **DayOS** | `memory/dayos/` | **live** (2026-07) | Journals, activity blocks, captures/notes, project sessions, learning log, ratings, reviews — his whole logged life |
+| **Playbook** | `memory/playbook/` | **live** (2026-07-12) | Read-only git mirror of his cross-project rules, lessons, North Star, curriculum, LEARNINGS ledger (tools: `search_playbook`, `playbook_doc`) |
+| **Agent digests** | `memory/digests/` | **built** (2026-07-12) | AI-written weekly syntheses — the agent's own opinion lane; written Fridays (or `/digest`), never overwrites mirrors; read via `weekly_digest` |
+| Drive notes | `memory/drive/` (future) | planned | His Google-Drive-synced notes, mirrored read-only the same way |
 | Spend | `memory/usage/*.json` | live (Phase 1) | Cost accounting (not model-visible) |
 
 The pattern every future bank must follow (this is the contract):

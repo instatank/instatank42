@@ -24,6 +24,7 @@ from telegram.ext import (
 
 import budget
 import dayos_store
+import digests
 import memory
 import playbook_store
 
@@ -209,6 +210,27 @@ PLAYBOOK_TOOLS = [
 ]
 
 
+# Weekly-synthesis read tool — reads stored digests only; generation (which
+# costs tokens) happens solely via /digest or the Friday timer.
+DIGEST_TOOL = {
+    "name": "weekly_digest",
+    "description": (
+        "Read one of YOUR OWN stored weekly syntheses — the distillation you "
+        "(the agent) wrote about the user's week: patterns, deltas, open loops. "
+        "Clearly your notes, not his words. Use for 'what did you make of my "
+        "week' or when past weeks' arcs matter."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "period": {"type": "string",
+                       "description": "'this week', 'last week', or a date in the week."}
+        },
+        "required": ["period"],
+    },
+}
+
+
 def current_tools() -> list:
     """Bank tools appear once their sync is configured or data exists, so the
     bot works unchanged before each integration is set up."""
@@ -220,6 +242,8 @@ def current_tools() -> list:
         tools += DAYOS_TOOLS
     if playbook_store.has_data() or os.environ.get("PLAYBOOK_REPO_URL"):
         tools += PLAYBOOK_TOOLS
+    if digests.has_any():
+        tools.append(DIGEST_TOOL)
     return tools
 
 
@@ -243,6 +267,8 @@ def handle_tool(name: str, args: dict) -> str:
             return playbook_store.search(args.get("query", ""))
         if name == "playbook_doc":
             return playbook_store.doc(args.get("name", ""))
+        if name == "weekly_digest":
+            return digests.load(args.get("period", "this week"))
         return f"Unknown tool: {name}"
     except Exception as e:
         log.exception("Tool %s failed", name)
@@ -408,7 +434,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     await update.message.reply_text(
         "Hi — I'm your agent. Just talk to me. /remember saves a fact, "
-        "/spend shows today's cost, /sync refreshes your DayOS data."
+        "/spend shows today's cost, /sync refreshes the memory banks, "
+        "/digest writes this week's synthesis now."
     )
 
 
@@ -468,6 +495,28 @@ async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await send_reply(update, "\n".join(lines))
 
 
+async def cmd_digest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Generate (or regenerate) this week's synthesis right now and reply with
+    it. The Friday timer does the same thing unprompted."""
+    if not authorized(update):
+        return
+    if not dayos_store.has_data():
+        await update.message.reply_text(
+            "No DayOS data synced yet — the synthesis is written from it. Run /sync first.")
+        return
+    await update.message.reply_text("Writing this week's synthesis…")
+    try:
+        result = await asyncio.to_thread(digests.generate_week, "", client)
+    except digests.BudgetCapError as e:
+        await send_reply(update, f"Skipped: {e}")
+        return
+    except Exception as e:
+        log.exception("Digest generation failed")
+        await send_reply(update, f"Synthesis FAILED: {e}")
+        return
+    await send_reply(update, result["text"])
+
+
 async def cmd_spend(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not authorized(update):
         return
@@ -495,6 +544,7 @@ def main() -> None:
     app.add_handler(CommandHandler("remember", cmd_remember))
     app.add_handler(CommandHandler("spend", cmd_spend))
     app.add_handler(CommandHandler("sync", cmd_sync))
+    app.add_handler(CommandHandler("digest", cmd_digest))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     log.info("Bot starting (models: %s / %s, daily cap $%.2f)", HAIKU, SONNET, budget.DAILY_CAP_USD)
     app.run_polling(allowed_updates=Update.ALL_TYPES)

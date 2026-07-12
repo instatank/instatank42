@@ -1,0 +1,18 @@
+[Unit]
+Description=Generate and deliver the Friday weekly synthesis
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=agent
+WorkingDirectory=/opt/instatank-agent
+EnvironmentFile=/opt/instatank-agent/.env
+ExecStart=/opt/instatank-agent/venv/bin/python digests.py --send
+
+# Same hardening profile as the bot: may only write under memory/
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/instatank-agent/memory
+ProtectHome=yes
+PrivateTmp=yes

@@ -17,9 +17,9 @@ what was actually built and deployed.*
 |---|---|---|---|
 | 0 | Deploy the bot | ✅ **Done** (founder-confirmed 2026-07-12) | Live on the VPS, in daily use. |
 | 1 | DayOS memory bank | ✅ **Live** (built 2026-07-07; founder-verified in use 2026-07-12) | One residual task below. |
-| 2 | Principles layer — playbook + LEARNINGS | 🔨 **Code built + tested** (2026-07-12) | Awaiting the 5-min VPS setup: `deploy/DEPLOY.md` step 8. |
-| 3 | Distillation + retrieval quality | 📋 Planned (after 2) | Mechanical digests already exist; this adds the AI-authored layer. |
-| 4 | Proactive loops | 📋 Planned (after 3) | **Founder decision: Friday-only first** — earn the daily slots. |
+| 2 | Principles layer — playbook + LEARNINGS | ✅ **Live** (founder-verified 2026-07-12) | Bot quotes actual playbook rules. |
+| 3 | Distillation — AI weekly synthesis | 🔨 **Code built + tested** (2026-07-12) | `digests.py` + `weekly_digest` tool + `/digest`. Live after server `git pull` + `setup_vps.sh` re-run. |
+| 4 | Proactive loops — Friday delivery | 🔨 **Code built + tested** (2026-07-12) | `weekly-digest.timer`, Fri 18:00 IST, failures messaged to Telegram. Friday-only per founder decision; morning/evening nudges stay unbuilt until Friday earns it. |
 | 5 | New sources, by gate | 🔁 Ongoing | Tracked per-source in `BACKLOG.md`; gate below. |
 
 ### Phase 1 residual — the staleness drill
@@ -114,11 +114,14 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 
 ## Open items
 
-- [ ] Run the Phase-1 staleness drill (checklist item 5) once.
-- [x] Phase 2 code: playbook/LEARNINGS bank — built + tested 2026-07-12.
-- [ ] Founder: Phase 2 VPS setup (`deploy/DEPLOY.md` step 8 — fine-grained
-      GitHub token + two `.env` lines + first sync). Then test: "what's my
-      rule about bundled fixes?"
+- [ ] Run the Phase-1 staleness drill (checklist item 5) once — with the
+      health banner it now shows on ANY message while a bank is broken.
+- [x] Phase 2: playbook/LEARNINGS bank — LIVE, founder-verified 2026-07-12.
+- [x] Phases 3+4 code: weekly synthesis + Friday delivery — built + tested
+      2026-07-12.
+- [ ] Founder: pull Phases 3+4 onto the server (`git pull` + re-run
+      `setup_vps.sh` to install the new timer), then send `/digest` to see
+      the first synthesis.
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).
