@@ -45,12 +45,29 @@ Infrastructure that more than one integration needs. Build once, reuse.
 
 ## Integrations
 
-### DayOS (time tracking + journaling) — ✅ Live (2026-07-07)
+### DayOS (time tracking + journaling) — ✅ Live (2026-07-07; founder-verified in production 2026-07-12)
 
 Journals, activity blocks, notes, project sessions, learning log, trends,
 weekly/monthly reviews. Read-only Firestore mirror (building block #1).
 Full detail: `docs/SECOND_BRAIN.md`, contract doc
 `time-tracker/docs/second-brain-integration.md`.
+
+### Shared playbook + LEARNINGS (the principles layer) — 📋 Planned (next up, Phase 2 in `docs/ROADMAP.md`)
+
+**What:** the founder's accumulated working rules and lessons — the
+`playbook/` folder in `instatank/time-tracker` (PLAYBOOK, NORTH_STAR,
+CURRICULUM, LEARNING_METHOD, SOPs) plus each repo's `LEARNINGS.md` ledger —
+mirrored read-only into `memory/playbook/`, so the agent can quote his own
+rules back at him, knows the technique-of-the-week, and can coach against
+his own principles.
+
+**Pattern:** the simplest bank yet — a `git clone` + periodic `git pull` on
+the VPS (the playbook is already plain markdown in git; no API, no parser,
+no cost). Standard sync-status file + staleness warnings + a read/search
+tool. Never fork a copy — pull it (playbook README rule).
+
+**Needs:** read access to the GitHub repo from the VPS (public clone or a
+read-only deploy key), ~1 session.
 
 ### WhatsApp chat history — 📋 Planned
 
@@ -94,6 +111,10 @@ selective about which chats get fed in.
 **What:** not yet scoped — flagged as a future integration during the
 WhatsApp discussion, no detail captured yet.
 
+**Founder steer (2026-07-12):** the trading products (TradeGenie etc.) are
+themselves works-in-progress — mature the product first, feed it in later
+(the feeder-products principle in `docs/ROADMAP.md`).
+
 **Needs before this can move to 📋 Planned** (ask the founder when we pick
 this up):
 - What system/format the journal(s) live in today (spreadsheet, broker
@@ -120,6 +141,22 @@ no embeddings unless plain search demonstrably fails.
 
 **Status:** unstarted, no blockers besides prioritization against the other
 entries here.
+
+### Cadence (workouts) — 💡 Idea, gated on product maturity
+
+**What:** workout/consistency data pairing naturally with DayOS energy and
+day ratings ("does training correlate with my focus hours?").
+
+**Founder steer (2026-07-12):** Cadence is "very basic and a work in
+progress" — build the product out first, feed it in once it's in better
+working condition. When it matures: memory-bank pattern (building block #1),
+plus a contract doc in the Cadence repo like DayOS's.
+
+### Meal-Planner — 💡 Idea, gated on product maturity
+
+**What:** not yet scoped. Same founder steer as Cadence (2026-07-12): the
+current version is dated; mature it first, then evaluate through the gate in
+`docs/ROADMAP.md` (weekly-use test before anything else).
 
 ## Parked
 
