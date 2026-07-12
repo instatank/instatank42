@@ -1,0 +1,35 @@
+name: Auto-sync Claude branch to main
+on:
+  push:
+    branches: ['claude/**']
+
+jobs:
+  sync-to-main:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge claude branch into main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          git fetch origin "$BRANCH"
+          git merge "origin/$BRANCH" --ff-only \
+            || git merge "origin/$BRANCH" --no-ff -m "Auto-merge: $BRANCH"
+          git push origin main
+
+      - name: Rebase claude branch onto updated main
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          git fetch origin main
+          git checkout "$BRANCH"
+          git rebase origin/main
+          git push --force-with-lease origin "$BRANCH"
