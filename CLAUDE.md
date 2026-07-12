@@ -8,9 +8,13 @@ Personal AI agent for a solo builder (ex-poker pro, New Delhi, non-technical —
 steers, Claude Code writes all code). Telegram bot → Anthropic API → file-based
 memory. Budget ceiling ~$20/month all-in, target $8–15.
 
-## Current status (2026-07-03)
+## Current status (2026-07-12)
 
 - **Phase 1 code complete, tested offline, NOT yet deployed or tested end-to-end.**
+- **Second brain planned:** `docs/SECOND_BRAIN.md` is the PROPOSED strategy + roadmap
+  (awaiting founder confirmation). It is the plan-of-record target that
+  `time-tracker/docs/second-brain-integration.md` (the DayOS data contract) points to.
+  Nothing brain-side is built yet — deploy Phase 1 first.
 - Offline smoke tests pass (`venv/bin/python tests/test_smoke.py`).
 - Waiting on him: Hetzner VPS signup, BotFather token, Anthropic API key (all
   require his accounts/money). Deploy guide: `deploy/DEPLOY.md`.
@@ -56,6 +60,7 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 
 ## File map
 
+- `docs/SECOND_BRAIN.md` — second-brain strategy, memory layout, phased roadmap (proposed)
 - `bot.py` — handlers, allowlist, model routing, tool loop, caps enforcement
 - `memory.py` — profile/session-log/facts file I/O (IST timezone)
 - `budget.py` — cost-per-call from usage block, daily/monthly accounting, cap
