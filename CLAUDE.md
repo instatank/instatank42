@@ -95,6 +95,16 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   VPS ≈ €4–5/mo. Total lands in the $10–15 target band.
 - **anthropic SDK is sync**; called via `asyncio.to_thread` from the async
   telegram handler so the event loop doesn't block.
+- **`sudo -u agent python <sync>.py` does NOT load `.env`** — EnvironmentFile
+  is a systemd concept. Manual sync runs on the VPS must go through
+  `systemctl start dayos-sync.service` (or Telegram `/sync`); a bare sudo run
+  prints "not configured" and skips green. Bit us during the staleness drill
+  (2026-07-12): the drill's "failing" sync recorded nothing.
+- **Bank health warnings are machine-enforced**: `bot.health_banner()`
+  prefixes every reply with ⚠️ while any bank's sync is stale/failed. Added
+  after the model demonstrably answered from a broken bank's mirror without
+  relaying the warning text it was given (playbook L11). Never remove it or
+  downgrade it to prompt-only.
 
 ## File map
 

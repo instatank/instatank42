@@ -149,6 +149,21 @@ def test_bot_wiring():
     print("ok bot wiring")
 
 
+def test_health_banner():
+    # healthy: fresh sync, no errors -> no banner on replies
+    fresh = memory.now().isoformat()
+    playbook_store.STATUS_PATH.write_text(json.dumps({"last_success": fresh}))
+    assert bot.health_banner() == ""
+    # broken: a failed sync must surface mechanically, not via model goodwill
+    playbook_store.STATUS_PATH.write_text(json.dumps({
+        "last_success": fresh, "last_error": "clone exploded",
+        "last_error_time": (memory.now() + timedelta(minutes=1)).isoformat(),
+    }))
+    assert "FAILED" in bot.health_banner()
+    playbook_store.STATUS_PATH.write_text(json.dumps({"last_success": fresh}))
+    print("ok health banner")
+
+
 if __name__ == "__main__":
     try:
         make_source_repo()
@@ -158,6 +173,7 @@ if __name__ == "__main__":
         test_store_reads()
         test_staleness()
         test_bot_wiring()
+        test_health_banner()
         print("ALL PLAYBOOK TESTS PASSED")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

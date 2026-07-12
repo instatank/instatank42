@@ -224,17 +224,22 @@ Add this line (it's already in the file if you copied `.env.example`):
 FIREBASE_SERVICE_ACCOUNT_FILE=/opt/instatank-agent/.firebase-sa.json
 ```
 
-4. Run the first sync and restart the bot:
-
-```
-sudo -u agent /opt/instatank-agent/venv/bin/python /opt/instatank-agent/dayos_sync.py --full
-```
-*Pulls your whole DayOS history into the agent's memory (takes a few seconds).*
+4. Restart the bot and turn on the auto-sync:
 
 ```
 systemctl restart telegram-agent && systemctl start dayos-sync.timer
 ```
-*Restarts the bot so it sees the new data, and turns on the every-2-hours auto-sync.*
+*Restarts the bot so it sees the new key, and turns on the every-2-hours auto-sync.*
+
+Then in Telegram send **`/sync full`** — that pulls your whole DayOS history
+into the agent's memory (a few seconds) and replies with what it fetched.
+
+> Why through Telegram? Running the sync script by hand with `sudo` does NOT
+> load the settings in `.env` (only systemd and the bot itself do), so a
+> manual `python dayos_sync.py` just prints "not configured" and quits.
+> If you ever want a manual server-side run, use
+> `systemctl start dayos-sync.service` and check it with
+> `journalctl -u dayos-sync --no-pager -n 15`.
 
 5. Test it: ask the bot something like *"what did I do yesterday?"* or
    *"how was my week?"* — it should answer from your real DayOS data.
@@ -284,17 +289,15 @@ PLAYBOOK_REPO_URL=https://github.com/instatank/time-tracker.git
 PLAYBOOK_REPO_TOKEN=github_pat_paste-yours-here
 ```
 
-4. Run the first sync and restart the bot:
-
-```
-sudo -u agent /opt/instatank-agent/venv/bin/python /opt/instatank-agent/playbook_sync.py
-```
-*Downloads a read-only copy of the playbook into the agent's memory (a second or two). It should end with "done … N docs".*
+4. Restart the bot so it picks up the new settings:
 
 ```
 systemctl restart telegram-agent
 ```
-*Restarts the bot so the new playbook tools appear.*
+
+Then in Telegram send **`/sync`** — the reply should include a line like
+*"Playbook: commit a1b2c3d, 10 docs."* (Don't run the sync script by hand
+with `sudo` — it won't see `.env`; see the note in step 7.)
 
 5. Test it: ask the bot *"what's my rule about bundled fixes?"* or *"what's
    this week's technique?"* — it should quote the actual playbook.

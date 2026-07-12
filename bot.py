@@ -248,6 +248,15 @@ def handle_tool(name: str, args: dict) -> str:
         log.exception("Tool %s failed", name)
         return f"Tool error in {name}: {e}"
 
+def health_banner() -> str:
+    """Sync problems ride on every reply mechanically — never via the model
+    remembering to mention them (playbook L11: machine-enforced, not
+    memory-enforced). Verified necessary: the model happily answered from a
+    broken bank's mirror without relaying the warning it was given."""
+    notes = [n for n in (dayos_store.staleness_note(), playbook_store.staleness_note()) if n]
+    return "\n".join(notes)
+
+
 client = anthropic.Anthropic()
 
 # chat_id -> list of {"role", "content"} for the live conversation window
@@ -383,7 +392,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     histories[chat_id] = new_messages[-MAX_HISTORY_MSGS:]
     memory.append_session("user", user_text)
     memory.append_session("agent", reply)
-    await send_reply(update, reply or "(empty reply)")
+    banner = health_banner()
+    prefix = f"⚠️ {banner}\n\n" if banner else ""
+    await send_reply(update, prefix + (reply or "(empty reply)"))
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
