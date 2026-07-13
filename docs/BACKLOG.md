@@ -115,6 +115,57 @@ press.
 **Privacy note:** exports contain the other party's messages too. Be
 selective about which chats get fed in.
 
+### Wispr Flow dictation history — 🔨 Code built + offline-tested (2026-07-13); blocked on a local Mac run
+
+**What:** a full-text archive of everything dictated through Wispr Flow
+(voice-to-text), so the agent can search past dictations the way it searches
+WhatsApp chats or the playbook.
+
+**Why it's stuck at this status:** the session that scoped this ran in
+`instatank42`'s cloud/remote Claude Code environment, which has no
+filesystem link to the founder's actual Mac — Wispr Flow's SQLite database
+only exists there. The session could not locate the DB, inspect its real
+schema, or run the export against real data (all explicitly required before
+the script can be trusted). It built and offline-tested the script's logic
+against a synthetic fixture instead, and stopped short of claiming this is
+done.
+
+**Built (2026-07-13, offline-tested only):**
+- `wispr_export.py` — standalone script (deliberately has zero dependency on
+  `bot.py`/the venv — stdlib only) that: locates the DB (`~/Library/Application
+  Support/*wispr*` first, broad `~` search as fallback), copies it via
+  SQLite's online-backup API through a read-only source connection (never
+  touches the live file itself, survives Wispr Flow having it open), prints
+  the real schema, and guesses which table/columns hold dictation text vs.
+  timestamp vs. app vs. word count vs. duration by keyword matching — saved
+  to `.schema_map.json` for the founder (or a local session) to eyeball and
+  correct. Output: `~/WisprFlowExports/full-history.json` (every column,
+  nothing dropped) + `full-history.md` (grouped by date, newest first).
+  Incremental via `.last_export.json`; `--full` forces a clean re-pull.
+  Handles the Core-Data-vs-Unix-epoch timestamp ambiguity common in Swift
+  apps by testing candidate epochs against "is this plausibly recent" rather
+  than assuming one.
+- `tests/test_wispr_export.py` — synthetic SQLite fixture (deliberately
+  non-obvious column names, plus a decoy table) proves the schema-guessing
+  logic and incremental/full-re-pull dedup work correctly. This validates
+  the *mechanism*, not real Wispr Flow data — that still needs a real run.
+
+**Still needs (a local Claude Code session on the actual Mac):**
+1. Run `python3 wispr_export.py --inspect-only` to see Wispr Flow's real
+   schema and confirm the guessed table/column mapping in
+   `~/WisprFlowExports/.schema_map.json` is right (fix by hand if not).
+2. Confirm the detected timestamp format (printed in the run summary) is
+   correct — wrong epoch guess silently produces wrong dates.
+3. Run a real export, sanity-check a handful of entries in `full-history.md`.
+4. Decide how the export feeds the brain: reuses building block #2
+   (Telegram file-drop `ingest.py`, like WhatsApp — upload `full-history.md`
+   manually or on a schedule) is the natural fit since the DB is Mac-only
+   and unreachable from the VPS; a new `wispr_ingest.py` parser module would
+   be the only new code needed on the bot side.
+5. If routine/scheduled pulls are wanted (the original ask): a `launchd`
+   job on the Mac running `wispr_export.py` on a schedule, since there is no
+   VPS-side equivalent (the DB never leaves the Mac).
+
 ### Trading journal(s) — 💡 Idea
 
 **What:** not yet scoped — flagged as a future integration during the

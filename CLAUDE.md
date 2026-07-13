@@ -21,8 +21,14 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   rest of the second brain (principles layer, distillation, proactive loops,
   source gate). Read it for any "what's next" conversation.
 - **Read `docs/BACKLOG.md` every session** — the living tracker for planned
-  memory-bank integrations (WhatsApp chat history, trading journals, Drive
-  notes, playbook, ...), their status, and shared plumbing to club across them.
+  memory-bank integrations (WhatsApp chat history, Wispr Flow dictation
+  history, trading journals, Drive notes, playbook, ...), their status, and
+  shared plumbing to club across them.
+- **Wispr Flow export script built + offline-tested, blocked on a local Mac
+  run** (2026-07-13): `wispr_export.py` exports dictation history from
+  Wispr Flow's local SQLite DB — but that DB only exists on the founder's
+  Mac, unreachable from this repo's cloud sessions, so it's untested against
+  real data. Detail + next steps: `docs/BACKLOG.md`.
 - **Playbook memory bank (Phase 2) LIVE** (founder-verified 2026-07-12): the
   bot quotes actual playbook rules. `playbook_sync.py` git-mirrors
   time-tracker's `playbook/` + `LEARNINGS.md`; bot tools `search_playbook` +
@@ -156,10 +162,23 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   snapshot writer into `memory/whatsapp/`
 - `whatsapp_store.py` — read side: search/chat reads, coverage notes,
   ingest-failure warnings, prompt note
+- `wispr_export.py` — standalone Mac-local utility (NOT wired into the bot or
+  VPS): exports Wispr Flow's dictation history from its local SQLite DB to
+  `~/WisprFlowExports/full-history.{json,md}`, incremental via
+  `.last_export.json`. Schema-adaptive (queries `sqlite_master`/
+  `PRAGMA table_info` and guesses the table/column mapping by keyword,
+  saved to `.schema_map.json` for the founder to correct) because Wispr
+  Flow's real schema was never inspected from this repo's sessions — it
+  only exists on the founder's Mac, unreachable from a cloud session. Needs
+  a local Claude Code run (see `docs/BACKLOG.md`) to find the real DB,
+  validate/fix the guessed column map and detected timestamp epoch, and do
+  the first real export before this is trustworthy.
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
-  `tests/test_digests.py`, `tests/test_whatsapp.py` — offline tests, no
-  network (playbook sync tests clone a local file:// repo; digest tests fake
-  the Anthropic client)
+  `tests/test_digests.py`, `tests/test_whatsapp.py`,
+  `tests/test_wispr_export.py` — offline tests, no network (playbook sync
+  tests clone a local file:// repo; digest tests fake the Anthropic client;
+  wispr_export tests build a synthetic SQLite fixture since the real schema
+  is unknown)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
 - `docs/ROADMAP.md` — phased second-brain roadmap + founder decision log
 - `docs/BACKLOG.md` — living tracker for planned integrations (WhatsApp,
