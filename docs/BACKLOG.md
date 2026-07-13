@@ -162,9 +162,13 @@ done.
    manually or on a schedule) is the natural fit since the DB is Mac-only
    and unreachable from the VPS; a new `wispr_ingest.py` parser module would
    be the only new code needed on the bot side.
-5. If routine/scheduled pulls are wanted (the original ask): a `launchd`
-   job on the Mac running `wispr_export.py` on a schedule, since there is no
-   VPS-side equivalent (the DB never leaves the Mac).
+5. Routine/scheduled pulls (the original ask) — built:
+   `deploy/com.instatank.wispr-export.plist`, a macOS launchd LaunchAgent
+   (the Mac-local equivalent of the VPS's systemd timers, since the DB never
+   leaves the Mac). Defaults to every 6 hours; the plist's own header
+   comment has the one-time setup commands and how to switch to a fixed
+   daily time instead. Install this only after step 1-3 above confirm the
+   script works against the real database.
 
 ### Trading journal(s) — 💡 Idea
 

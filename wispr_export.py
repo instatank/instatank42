@@ -1,9 +1,11 @@
 """Wispr Flow dictation-history exporter — a personal utility script, not
 part of the deployed bot. Wispr Flow's SQLite database lives on the founder's
-Mac, not the VPS, so this runs locally (by hand, or on a launchd/cron
-schedule) and writes to ~/WisprFlowExports/. It is version-controlled here
-for the same reason dayos_sync.py and playbook_sync.py live in this repo:
-one reusable, reviewable script rather than a one-off shell session.
+Mac, not the VPS, so this runs locally and writes to ~/WisprFlowExports/. It
+is version-controlled here for the same reason dayos_sync.py and
+playbook_sync.py live in this repo: one reusable, reviewable script rather
+than a one-off shell session. For routine/scheduled pulls, see
+deploy/com.instatank.wispr-export.plist (a macOS launchd LaunchAgent —
+install only after this script has been verified against the real DB).
 
 READ-ONLY CONTRACT: this script must never write to Wispr Flow's live
 database. It opens the source via a read-only SQLite URI connection and uses
