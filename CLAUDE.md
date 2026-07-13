@@ -135,6 +135,17 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   after the model demonstrably answered from a broken bank's mirror without
   relaying the warning text it was given (playbook L11). Never remove it or
   downgrade it to prompt-only.
+- **Mac-only data sources need a LOCAL Claude Code session, full stop.**
+  Cloud/remote sessions (claude.ai/code web, GitHub-triggered runs) have zero
+  filesystem link to the founder's Mac — no `~/Library`, nothing. A cloud
+  session can write and offline-test a script against a synthetic fixture,
+  but cannot locate the real file, inspect the real schema, or validate real
+  output. Learned the hard way on the Wispr Flow export (2026-07-13,
+  `docs/BACKLOG.md`): a whole `/goal` cycle went in circles because the
+  session kept retrying a physically impossible step instead of the work
+  being scoped for a local session from the start. Any future Mac-local
+  integration (another local app's DB, local files not in git/Drive) —
+  scope it for a local session up front; don't discover this mid-task.
 
 ## File map
 
