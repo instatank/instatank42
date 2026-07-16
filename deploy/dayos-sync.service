@@ -1,5 +1,5 @@
 [Unit]
-Description=Sync the agent's memory banks (DayOS + playbook)
+Description=Sync the agent's memory banks (DayOS + playbook + brain)
 After=network-online.target
 Wants=network-online.target
 
@@ -8,9 +8,10 @@ Type=oneshot
 User=agent
 WorkingDirectory=/opt/instatank-agent
 EnvironmentFile=/opt/instatank-agent/.env
-# '-' prefix: a playbook failure is recorded in its own status file (the bot
-# warns loudly) but must never block the DayOS sync below it.
+# '-' prefix: a playbook/brain failure is recorded in its own status file (the
+# bot warns loudly) but must never block the DayOS sync below it.
 ExecStart=-/opt/instatank-agent/venv/bin/python playbook_sync.py
+ExecStart=-/opt/instatank-agent/venv/bin/python brain_sync.py
 ExecStart=/opt/instatank-agent/venv/bin/python dayos_sync.py
 
 # Same hardening profile as the bot: may only write under memory/

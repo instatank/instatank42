@@ -308,6 +308,42 @@ with `sudo` — it won't see `.env`; see the note in step 7.)
 - If the sync ever says "SYNC FAILED", the bot will also warn you itself the
   next time you ask a playbook question — run `/sync` after fixing.
 
+## 8b. Let the bot read your saved Claude Code sessions — usually zero setup
+
+Every time you run **`/save-to-brain`** at the end of a Claude Code session,
+a digest of that session (what was built, decided, learned) lands in your
+private `2ndbrain` repo on GitHub. This step gives the Telegram bot a
+read-only mirror of those digests, so you can ask it things like *"what did
+we figure out about the YouTube pipeline in that session?"*.
+
+**If you've already done step 10b (the nightly backup), there is nothing to
+configure** — the mirror reuses the same repo address and token from `.env`.
+Just update the server:
+
+```
+cd /opt/instatank-agent && git pull && bash deploy/setup_vps.sh https://github.com/instatank/instatank42.git
+```
+
+Then send **`/sync`** in Telegram — the reply should include a line like
+*"Brain: commit a1b2c3d, 3 session digests."* From then on it refreshes
+itself every 2 hours, same as the other banks.
+
+**If you haven't set up the backup yet**, either do step 10b first (it's the
+better deal — backup + this bank in one), or add just a read-only pair to
+`.env`:
+
+```
+BRAIN_REPO_URL=https://github.com/instatank/2ndbrain.git
+BRAIN_REPO_TOKEN=a-fine-grained-token-with-Contents-READ-on-that-one-repo
+```
+
+**Notes:**
+- The bot only reads the repo's `sessions/` folder — the `memory/` folder in
+  the same repo is the backup *of* the bot, and reading it back in would be
+  circular.
+- If the sync ever fails, the bot warns you at the top of its replies until
+  a `/sync` succeeds again — same loud-failure rule as every other bank.
+
 ## 9. Feed it WhatsApp conversations — optional, 2 minutes per chat
 
 No server setup at all for this one — if the bot is running, it already works.

@@ -70,7 +70,7 @@ before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
 | Agent weekly digests | the AI's own weekly synthesis | native | 🔨 Built |
 | WhatsApp chats | chosen conversations, snapshot-based | BB#2 | 🔨 Built |
 | Wispr Flow dictations | everything voice-typed | Mac export → BB#2 | 🔨 Blocked on local Mac run |
-| Claude Code conversations | insights/decisions distilled from his sessions across all projects | `/save-to-brain` skill writes AI-condensed digest → git push to `instatank/2ndbrain` → BB#1 mirror | 🔨 Skill + repo live (2026-07-16); bot mirror next (entry below) |
+| Claude Code conversations | insights/decisions distilled from his sessions across all projects | `/save-to-brain` skill writes AI-condensed digest → git push to `instatank/2ndbrain` → BB#1 mirror | 🔨 Skill + repo live; bot mirror built + tested offline (2026-07-16) |
 | YouTube — tagged videos | transcripts/summaries of videos he *chooses* to keep (send link to bot = the tag) | link-drop pipeline (BB#2 sibling) | 🔨 Code built + tested offline (2026-07-16) |
 | Google Drive notes | his Drive-synced notes | BB#1 (Drive API) | 📋 Planned (original Phase 2) |
 | Gmail | email history — agreements, bookings, receipts, threads | BB#2 (Takeout .mbox) first; BB#1 (API) only if refresh cadence demands it | 💡 Idea (entry below) |
@@ -297,7 +297,7 @@ Priya?"). Cross-references WhatsApp/DayOS mentions.
 file the founder edits. Cheapest possible source; the question is curation
 habit, not code.
 
-### Claude Code conversations — 🔨 Skill built + storehouse repo live (2026-07-16); bot-side mirror is the next step
+### Claude Code conversations — 🔨 Skill + repo live; bot-side mirror BUILT (2026-07-16), live after VPS deploy
 
 **What:** the founder's LLM session history — a lot of thinking, decisions,
 and derived insights live only inside Claude Code conversations (he uses
@@ -390,10 +390,18 @@ whether backfill is even possible; if it finds nothing, the answer is "his
 sessions run in the cloud" and the forward-only skill is the whole story.
 
 **Open items:**
-- [ ] **Bot-side mirror bank (step 3 above) — the next build.** Clone the
-      playbook-bank pattern: git-mirror 2ndbrain into `memory/brain/`,
-      store module, bot tools (`search_session_digests`/`session_digest`),
-      staleness warnings, tests, same 2h timer. One clean session of work.
+- [x] **Bot-side mirror bank (step 3 above) — built 2026-07-16.**
+      `brain_sync.py` git-mirrors 2ndbrain into `memory/brain/repo/`
+      (playbook pattern; reads only the `sessions/` lane — the repo's
+      `memory/` subfolder is the bot's own backup, reading it back would
+      be circular); `brain_store.py` read side; bot tools
+      `search_session_digests`/`session_digest`; staleness in the ⚠️
+      banner; rides the same 2h `dayos-sync.service` (`ExecStart=-`).
+      **Zero new config when the nightly backup is set up** — falls back
+      to `BACKUP_REPO_URL`/`BACKUP_REPO_TOKEN` (same repo); `BRAIN_REPO_*`
+      overrides exist. Tests `tests/test_brain.py`. Live after VPS
+      `git pull` + `setup_vps.sh` re-run + `/sync`
+      (`deploy/DEPLOY.md` § 8b).
 - [ ] Founder, one-time, on the Mac:
       `cp -r .claude/skills/save-to-brain ~/.claude/skills/` from a
       2ndbrain clone — makes `/save-to-brain` available in every local
