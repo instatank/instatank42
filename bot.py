@@ -24,6 +24,7 @@ from telegram.ext import (
     filters,
 )
 
+import brain_store
 import budget
 import dayos_store
 import digests
@@ -242,6 +243,50 @@ PLAYBOOK_TOOLS = [
 ]
 
 
+# Brain memory-bank tools — read the git mirror brain_sync.py maintains of
+# the 2ndbrain repo's sessions/ lane (Claude Code session digests pushed
+# there by the /save-to-brain skill).
+BRAIN_TOOLS = [
+    {
+        "name": "search_session_digests",
+        "description": (
+            "Search digests of the user's past Claude Code working sessions — "
+            "what was built, decided, learned, and left open in each. Use for "
+            "'what did we figure out about X in that session', 'why did we "
+            "choose Y', or any question about his past AI sessions across all "
+            "his projects. A single '#tag' query matches that exact tag only; "
+            "any other query requires ALL words. Results are labeled by "
+            "digest, newest first."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search words, or one '#tag'."}
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "session_digest",
+        "description": (
+            "Read one Claude Code session digest in full (topic, decisions, "
+            "insights, open threads). Name it by the label from a "
+            "search_session_digests result, or by date / project / topic "
+            "words — every word given must match, e.g. '2026-07-16 "
+            "instatank42' or 'youtube pipeline'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string",
+                         "description": "Digest label, or date/project/topic words."}
+            },
+            "required": ["name"],
+        },
+    },
+]
+
+
 # WhatsApp memory-bank tools — read the snapshot files whatsapp_ingest.py
 # writes when the founder uploads a chat export (no live sync by design).
 WHATSAPP_TOOLS = [
@@ -357,6 +402,9 @@ def current_tools() -> list:
         tools += DAYOS_TOOLS
     if playbook_store.has_data() or os.environ.get("PLAYBOOK_REPO_URL"):
         tools += PLAYBOOK_TOOLS
+    if brain_store.has_data() or os.environ.get("BRAIN_REPO_URL") \
+            or os.environ.get("BACKUP_REPO_URL"):
+        tools += BRAIN_TOOLS
     if whatsapp_store.has_data():
         tools += WHATSAPP_TOOLS
     if youtube_store.has_data():
@@ -388,6 +436,10 @@ def handle_tool(name: str, args: dict) -> str:
             return playbook_store.search(args.get("query", ""))
         if name == "playbook_doc":
             return playbook_store.doc(args.get("name", ""))
+        if name == "search_session_digests":
+            return brain_store.search(args.get("query", ""))
+        if name == "session_digest":
+            return brain_store.digest(args.get("name", ""))
         if name == "search_whatsapp":
             return whatsapp_store.search(args.get("query", ""), args.get("chat", ""))
         if name == "whatsapp_chat":
@@ -409,7 +461,8 @@ def health_banner() -> str:
     memory-enforced). Verified necessary: the model happily answered from a
     broken bank's mirror without relaying the warning it was given."""
     notes = [n for n in (dayos_store.staleness_note(), playbook_store.staleness_note(),
-                         whatsapp_store.staleness_note(), youtube_store.staleness_note()) if n]
+                         brain_store.staleness_note(), whatsapp_store.staleness_note(),
+                         youtube_store.staleness_note()) if n]
     return "\n".join(notes)
 
 
@@ -461,6 +514,9 @@ def build_system() -> list:
     pb_note = playbook_store.prompt_note()
     if pb_note:
         parts.append({"type": "text", "text": pb_note})
+    br_note = brain_store.prompt_note()
+    if br_note:
+        parts.append({"type": "text", "text": br_note})
     wa_note = whatsapp_store.prompt_note()
     if wa_note:
         parts.append({"type": "text", "text": wa_note})
@@ -819,10 +875,12 @@ async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     complete DayOS re-pull. Failures are reported per bank, never silent."""
     if not authorized(update):
         return
+    import brain_sync
     import dayos_sync  # lazy: pulls httpx/cryptography only when actually used
     import playbook_sync
 
-    if not dayos_sync.configured() and not playbook_sync.configured():
+    if not dayos_sync.configured() and not playbook_sync.configured() \
+            and not brain_sync.configured():
         await update.message.reply_text(
             "No memory banks are set up yet — deploy/DEPLOY.md steps 7 (DayOS) "
             "and 8 (playbook) have the walkthrough."
@@ -856,6 +914,16 @@ async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception as e:
             log.exception("Playbook sync failed")
             lines.append(f"Playbook sync FAILED: {e}")
+    if brain_sync.configured():
+        try:
+            status = await asyncio.to_thread(brain_sync.sync)
+            lines.append(
+                f"Brain: commit {status.get('commit')}, "
+                f"{status.get('files')} session digests."
+            )
+        except Exception as e:
+            log.exception("Brain sync failed")
+            lines.append(f"Brain sync FAILED: {e}")
     # DayOS learning-log links = tags (founder decision, silent auto-fetch):
     # scan on every /sync too, so a freshly logged link lands without waiting
     # for the daily timer.

@@ -63,9 +63,18 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   first real digest already saved — push flow proven). A convenience
   mirror of the skill lives in this repo's `.claude/skills/save-to-brain/`.
   Chosen over a Mac export because desktop-app sessions may execute in
-  the cloud with zero Mac footprint. **Next step for this source: the
-  bot-side mirror bank** (playbook_sync pattern on 2ndbrain + read tools) —
-  scoped in `docs/BACKLOG.md`.
+  the cloud with zero Mac footprint.
+- **Brain mirror bank (bot side of `/save-to-brain`) code complete + tested
+  offline** (2026-07-16): `brain_sync.py` git-mirrors `instatank/2ndbrain`
+  into `memory/brain/repo/` (playbook pattern; reads only the `sessions/`
+  lane — the repo's `memory/` subfolder is the bot's own nightly backup,
+  reading it back would be circular) + `brain_store.py` read side; bot
+  tools `search_session_digests`/`session_digest`; staleness in the ⚠️
+  banner; same 2h `dayos-sync.service` (`ExecStart=-`) + `/sync`. **Zero
+  new config where the nightly backup is set up** — config falls back to
+  `BACKUP_REPO_URL`/`BACKUP_REPO_TOKEN` (same repo); `BRAIN_REPO_*`
+  overrides exist. Live after VPS `git pull` + `setup_vps.sh` re-run
+  (refreshes the sync service) + `/sync` (`deploy/DEPLOY.md` § 8b).
 - **YouTube tagged-videos bank code complete + tested offline** (2026-07-16,
   founder-approved plan): send a YouTube link to the bot = the tag.
   `youtube_ingest.py` (link detect, oEmbed metadata, caption scrape →
@@ -131,7 +140,7 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
   `tests/test_whatsapp.py`, `tests/test_youtube.py`, `tests/test_backup.py`,
-  and `tests/test_brain_backfill.py`).
+  `tests/test_brain.py`, and `tests/test_brain_backfill.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -182,6 +191,16 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `playbook_doc`. Config: `PLAYBOOK_REPO_URL` (+ `PLAYBOOK_REPO_TOKEN` for a
   private repo — scrubbed from all output/status, never stored in the git
   remote on disk).
+- **Brain bank**: `brain_sync.py` keeps a read-only shallow git checkout of
+  `instatank/2ndbrain` under `memory/brain/repo/` (same mechanism as the
+  playbook bank, same 2h timer + `/sync`); `brain_store.py` reads ONLY the
+  repo's `sessions/` lane (Claude Code session digests from `/save-to-brain`)
+  — never its `memory/` subfolder, which is the bot's own nightly backup.
+  Bot tools: `search_session_digests`, `session_digest`. Config:
+  `BRAIN_REPO_URL`/`BRAIN_REPO_TOKEN`/`BRAIN_REPO_BRANCH`, all defaulting to
+  the `BACKUP_REPO_*` values (same repo) so the bank is on wherever the
+  backup is configured. Tokens scrubbed from all output/status, never stored
+  in the git remote on disk.
 - **WhatsApp bank**: manual chat exports only (WhatsApp → Export chat →
   Without media), uploaded to the bot as a Telegram file and routed through
   `ingest.py` — the generic file-drop pipeline (confirm-first inline buttons;
@@ -253,6 +272,11 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `memory/playbook/` + `sync_status.json`
 - `playbook_store.py` — read side: search/doc lookup, staleness warnings,
   prompt note
+- `brain_sync.py` — git-mirror orchestrator + CLI (`--status`) for the
+  2ndbrain repo, writes `memory/brain/` + `sync_status.json`; config falls
+  back to the `BACKUP_REPO_*` pair
+- `brain_store.py` — read side: search/digest lookup over the mirror's
+  `sessions/` lane only, staleness warnings, prompt note
 - `digests.py` — weekly + monthly syntheses and standing themes: build
   input from the DayOS mirror (+ own weeklies for monthlies), one Sonnet
   call each, write `memory/digests/<week>.md` / `months/<YYYY-MM>.md` /
@@ -302,9 +326,9 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   the first real export before this is trustworthy.
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
   `tests/test_digests.py`, `tests/test_whatsapp.py`, `tests/test_youtube.py`,
-  `tests/test_wispr_export.py`, `tests/test_backup.py`,
-  `tests/test_brain_backfill.py` — offline tests, no network (playbook sync +
-  backup tests clone/push a local file:// repo; digest tests fake the
+  `tests/test_wispr_export.py`, `tests/test_backup.py`, `tests/test_brain.py`,
+  `tests/test_brain_backfill.py` — offline tests, no network (playbook/brain
+  sync + backup tests clone/push a local file:// repo; digest tests fake the
   Anthropic client; wispr_export tests build a synthetic SQLite fixture since
   the real schema is unknown; backfill tests use synthetic JSONL + a temp git
   repo)
