@@ -61,7 +61,7 @@ before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
 | Agent weekly digests | the AI's own weekly synthesis | native | 🔨 Built |
 | WhatsApp chats | chosen conversations, snapshot-based | BB#2 | 🔨 Built |
 | Wispr Flow dictations | everything voice-typed | Mac export → BB#2 | 🔨 Blocked on local Mac run |
-| Claude Code conversations | insights/decisions distilled from his sessions across all projects | on-demand skill writes AI-condensed digest → git push → BB#1 mirror (new repo) | 💡 Idea, plan refined (entry below) |
+| Claude Code conversations | insights/decisions distilled from his sessions across all projects | `/save-to-brain` skill writes AI-condensed digest → git push to `instatank/2ndbrain` → BB#1 mirror | 🔨 Skill + repo live (2026-07-16); bot mirror next (entry below) |
 | YouTube — tagged videos | transcripts/summaries of videos he *chooses* to keep (send link to bot = the tag) | link-drop pipeline (BB#2 sibling) | 🔨 Code built + tested offline (2026-07-16) |
 | Google Drive notes | his Drive-synced notes | BB#1 (Drive API) | 📋 Planned (original Phase 2) |
 | Gmail | email history — agreements, bookings, receipts, threads | BB#2 (Takeout .mbox) first; BB#1 (API) only if refresh cadence demands it | 💡 Idea (entry below) |
@@ -288,7 +288,7 @@ Priya?"). Cross-references WhatsApp/DayOS mentions.
 file the founder edits. Cheapest possible source; the question is curation
 habit, not code.
 
-### Claude Code conversations — 💡 Idea, plan refined 2026-07-16
+### Claude Code conversations — 🔨 Skill built + storehouse repo live (2026-07-16); bot-side mirror is the next step
 
 **What:** the founder's LLM session history — a lot of thinking, decisions,
 and derived insights live only inside Claude Code conversations (he uses
@@ -323,13 +323,12 @@ entirely):**
    tight markdown digest: topic, key decisions, insights derived, open
    threads. Same philosophy as `digests.py`'s AI-authored weekly synthesis,
    applied per-session instead of per-week.
-2. The skill's last step: commit the digest and `git push` to one
-   dedicated collection repo (new, lightweight — e.g.
-   `instatank/session-digests` — not coupled to any one project's
-   lifecycle, since sessions span many repos). This works identically
-   whether the session executed on his Mac or in a cloud sandbox, since
-   both have git access — no export step, no Telegram upload, no Mac-only
-   constraint.
+2. The skill's last step: commit the digest and `git push` to the
+   dedicated collection repo — **`instatank/2ndbrain`** (founder created
+   it 2026-07-16) — not coupled to any one project's lifecycle, since
+   sessions span many repos. This works identically whether the session
+   executed on his Mac or in a cloud sandbox, since both have git access —
+   no export step, no Telegram upload, no Mac-only constraint.
 3. VPS side: reuse `playbook_sync.py`'s git-mirror mechanism verbatim,
    pointed at the new repo instead of time-tracker — same 2h timer, same
    staleness pattern. New bot tools: `search_session_digests`,
@@ -349,12 +348,34 @@ playbook bank. This integration adds a searchable per-session layer
 underneath, at finer grain and without waiting for something to earn a
 LEARNINGS entry.
 
-**Open items before building:**
+**Live now (built 2026-07-16):**
+- `instatank/2ndbrain` seeded: README with the repo's rules (markdown
+  only, no secrets, never force-push, the agent only reads) + the
+  **canonical** skill at `.claude/skills/save-to-brain/SKILL.md` + the
+  first real digest under `sessions/2026/` (the build session saved
+  itself — the compose→commit→push flow is proven end-to-end).
+- Convenience mirror of the skill in this repo's
+  `.claude/skills/save-to-brain/` (edit the 2ndbrain copy first).
+- Availability: instatank42 sessions have the skill via the mirror; any
+  cloud session gets it by adding the 2ndbrain repo to the session (which
+  the push needs anyway — the skill says to use add_repo); local Mac
+  sessions need the one-time copy below.
+
+**Open items:**
+- [ ] **Bot-side mirror bank (step 3 above) — the next build.** Clone the
+      playbook-bank pattern: git-mirror 2ndbrain into `memory/brain/`,
+      store module, bot tools (`search_session_digests`/`session_digest`),
+      staleness warnings, tests, same 2h timer. One clean session of work.
+- [ ] Founder, one-time, on the Mac:
+      `cp -r .claude/skills/save-to-brain ~/.claude/skills/` from a
+      2ndbrain clone — makes `/save-to-brain` available in every local
+      session regardless of repo (2ndbrain README § install).
+- [ ] Habit: end meaningful sessions with `/save-to-brain` — the skill
+      only captures sessions it's invoked in.
 - [ ] Founder: check the desktop app to determine local vs. remote
       execution mode for his Code sessions (informs whether an automatic
       Stop-hook upgrade could ever reach 100% local coverage; doesn't
       block the on-demand skill either way).
-- [ ] Founder: name/create the destination repo for digests.
 - [ ] One-time: verify whether claude.ai's data-export includes plain
       chat / Cowork history, if those are ever wanted too (lower priority
       — Code sessions carry the technical insight density).

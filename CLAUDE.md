@@ -55,15 +55,16 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   Calendar, Telegram exports, Kindle highlights, finance, people file —
   plus (same day, founder ask) Claude Code conversations and YouTube tagged
   videos.
-- **Claude Code conversations plan refined 2026-07-16**: not a Mac export —
-  local vs. remote/cloud execution is ambiguous for desktop-app sessions
-  (this session itself proves cloud-executed Code sessions exist, with zero
-  Mac footprint). Chosen approach instead: an on-demand skill
-  (`/save-to-brain`) that has Claude itself condense the session into a
-  markdown digest and git-push it to a new dedicated repo, mirrored into
-  the brain via the existing `playbook_sync.py` git-mirror pattern — works
-  whether the session ran locally or in the cloud, no export step needed.
-  Detail + open items: `docs/BACKLOG.md`.
+- **`/save-to-brain` skill LIVE** (2026-07-16): Claude Code sessions enter
+  the brain via an on-demand skill — Claude itself condenses the session
+  into a markdown digest and git-pushes it to **`instatank/2ndbrain`**
+  (founder-created storehouse repo; canonical skill + rules in its README;
+  first real digest already saved — push flow proven). A convenience
+  mirror of the skill lives in this repo's `.claude/skills/save-to-brain/`.
+  Chosen over a Mac export because desktop-app sessions may execute in
+  the cloud with zero Mac footprint. **Next step for this source: the
+  bot-side mirror bank** (playbook_sync pattern on 2ndbrain + read tools) —
+  scoped in `docs/BACKLOG.md`.
 - **YouTube tagged-videos bank code complete + tested offline** (2026-07-16,
   founder-approved plan): send a YouTube link to the bot = the tag.
   `youtube_ingest.py` (link detect, oEmbed metadata, caption scrape →

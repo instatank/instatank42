@@ -111,6 +111,7 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 | 2026-07-12 | **`main` branch created** | Founder-approved; all prior `claude/*` branches merged into it. Sessions merge to `main` before ending. Default-branch flip in GitHub settings still owed by founder (one click). |
 | 2026-07-12 | **Proactive cadence: Friday-only first** | Daily briefs must be earned by the Friday loop proving useful. |
 | 2026-07-12 | **DayOS mirror approach confirmed** | Founder: "the mirror idea for time tracker/dayos sounds good to me" — matches what was built. |
+| 2026-07-16 | **`instatank/2ndbrain` = the brain's storehouse repo; sessions enter via `/save-to-brain`** | Founder created the repo and approved the skill approach (Claude condenses the session itself and pushes the digest — no Mac export, works local or cloud). Skill built same day; bot-side mirror bank is the scoped next step (`docs/BACKLOG.md`). |
 | 2026-07-16 | **YouTube links in the DayOS learning log auto-fetch SILENTLY, daily** | The one deliberate exception to confirm-first ingestion: logging a link in his own learning log is already the act of curation, so no Telegram confirmation and no success notification (option 2 of the fork offered; also his call that every-2h would be overkill — daily + on-`/sync` instead). Run crashes still hit the ⚠️ banner; per-video fetch failures retry 3× then park, visible in `/sync`. |
 
 ## Open items
