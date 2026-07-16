@@ -50,6 +50,11 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   carrying the snapshot's coverage date. Live after VPS `git pull` + restart
   (no new config, no new timer); the founder then uploads his first export
   (`deploy/DEPLOY.md` step 9).
+- **Full source map added to `docs/BACKLOG.md`** (2026-07-16): one table of
+  every candidate source (live → excluded) + scoping entries for Gmail,
+  Calendar, Telegram exports, Kindle highlights, finance, people file.
+  Suggested order after current deploys: Gmail → Drive → Calendar.
+  Founder explainer: `docs/HOW_IT_WORKS.md`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
   and `tests/test_whatsapp.py`).
@@ -191,6 +196,10 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   wispr_export tests build a synthetic SQLite fixture since the real schema
   is unknown)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
+- `docs/HOW_IT_WORKS.md` — plain-language explainer for the founder: how a
+  huge file-based memory coexists with the model's small context (library/
+  desk analogy + diagrams). Point him here when he asks "how does this not
+  overload the model?"
 - `docs/ROADMAP.md` — phased second-brain roadmap + founder decision log
 - `docs/BACKLOG.md` — living tracker for planned integrations (WhatsApp,
   trading journals, Drive notes, ...); read every session, update as things move

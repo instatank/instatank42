@@ -44,6 +44,47 @@ Infrastructure that more than one integration needs. Build once, reuse.
    Trivial once 2+ banks exist; deferred until then to keep the tool list
    small (noted in `docs/SECOND_BRAIN.md`).
 
+## The full source map (2026-07-16)
+
+One table of everything that could feed the brain — live, planned, or merely
+possible — so nothing is forgotten and priorities are visible at a glance.
+Every row still passes the gate in `docs/ROADMAP.md` (weekly-use test first)
+before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
+**BB#2** = Telegram file-drop ingest (see Shared building blocks above).
+
+| Source | What it holds | Pipeline | Status |
+|---|---|---|---|
+| Profile + facts | who he is, durable facts | native (`remember_fact`) | ✅ Live |
+| Bot conversation log | every chat with the agent | native | ✅ Live |
+| DayOS | journals, time blocks, notes, sessions, reviews | BB#1 (Firestore) | ✅ Live |
+| Playbook + LEARNINGS | his rules, North Star, curriculum, lessons | BB#1 (git) | ✅ Live |
+| Agent weekly digests | the AI's own weekly synthesis | native | 🔨 Built |
+| WhatsApp chats | chosen conversations, snapshot-based | BB#2 | 🔨 Built |
+| Wispr Flow dictations | everything voice-typed | Mac export → BB#2 | 🔨 Blocked on local Mac run |
+| Google Drive notes | his Drive-synced notes | BB#1 (Drive API) | 📋 Planned (original Phase 2) |
+| Gmail | email history — agreements, bookings, receipts, threads | BB#2 (Takeout .mbox) first; BB#1 (API) only if refresh cadence demands it | 💡 Idea (entry below) |
+| Google Calendar | commitments, appointments, recurring blocks | BB#1 (ICS/API) | 💡 Idea (entry below) |
+| Telegram personal chats | same value as WhatsApp, other half of his chat life | BB#2 (Telegram Desktop JSON export) | 💡 Idea (entry below) |
+| Book/Kindle highlights | what he's read + marked | BB#2 (My Clippings.txt / Readwise CSV) | 💡 Idea (entry below) |
+| Finance | bank/card statements, subscriptions, spending patterns | BB#2 (CSV/PDF statements) | 💡 Idea (entry below; privacy-heavy) |
+| Health / sleep / workouts (raw) | Apple Health / fitness-app exports | BB#2 (Takeout/Health export) | 💡 Idea — overlaps Cadence; probably wait for Cadence |
+| People file (CRM-lite) | who's who: context on friends, family, collaborators | hand-curated file, no pipeline | 💡 Idea (entry below) |
+| Bookmarks / read-later | saved articles/links | BB#2 (browser/Pocket export) | 💡 Idea — weekly-use test doubtful, unranked |
+| Trading journal(s) | trades, sizing, mistakes, P&L | BB#2 (CSV/broker export) | 💡 Idea, gated on product maturity (entry below) |
+| Cadence (workouts) | training consistency vs. energy/focus | BB#1 + contract doc | 💡 Gated on product maturity |
+| Meal-Planner | nutrition | BB#1 + contract doc | 💡 Gated on product maturity |
+| Poker archive | hand histories, old poker journals | BB#2 | 💡 Legacy — only if he starts asking poker questions |
+| YouTube / watch history | consumption patterns | BB#2 (Takeout) | ⏸️ Fails the weekly-use test today |
+| Location history | Google Timeline | BB#2 (Takeout) | ⏸️ Fails the weekly-use test; privacy cost > value |
+| X/Twitter bookmarks | saved posts | BB#2 (data export) | ⏸️ Fails the weekly-use test today |
+| Photos / voice binaries | media | — | 🚫 Excluded by standing decision (pointers only) |
+| Other people's data | anything multi-user | — | 🚫 Excluded, hard line |
+
+**Suggested order of attack** (after the already-built items go live on the
+VPS): Gmail → Drive notes → Calendar → Telegram export → the rest as they
+pass the gate. Rationale: Gmail and Drive answer the most real weekly
+questions; Calendar is cheap; everything below is opportunistic.
+
 ## Integrations
 
 ### DayOS (time tracking + journaling) — ✅ Live (2026-07-07; founder-verified in production 2026-07-12)
@@ -169,6 +210,81 @@ done.
    comment has the one-time setup commands and how to switch to a fixed
    daily time instead. Install this only after step 1-3 above confirm the
    script works against the real database.
+
+### Gmail (email history) — 💡 Idea (added 2026-07-16)
+
+**What:** searchable email archive — "when is the flight?", "what did the
+landlord's last mail say?", "find the invoice from X". Likely the
+highest-value unbuilt source: email is where agreements, bookings, and
+receipts actually live.
+
+**Likely approach:** start with **Google Takeout** (.mbox export of chosen
+labels) through building block #2 — one `gmail_ingest.py` parser, zero new
+auth, snapshot semantics like WhatsApp (re-export to refresh). Upgrade to a
+BB#1 API mirror (read-only Gmail scope, OAuth) only if refresh frequency
+proves annoying — that adds a Google Cloud project + token refresh machinery,
+so earn it first.
+
+**Needs before building:** which labels/senders matter (whole inbox is
+noise + privacy risk — be selective like WhatsApp); one sample export to
+design the parser against.
+
+### Google Calendar — 💡 Idea (added 2026-07-16)
+
+**What:** commitments and appointments, past and upcoming — pairs naturally
+with DayOS ("what's my week look like?", "when did I last meet X?").
+
+**Likely approach:** cheapest possible BB#1 mirror — Google Calendar's
+private **ICS URL** (a secret link, no OAuth) pulled by the existing 2h
+timer into `memory/calendar/`. Snapshot the next ~90 days + trailing year.
+
+**Gate note:** passes the weekly-use test almost trivially, but check overlap
+first — if DayOS already captures his schedule, this may add little.
+
+### Telegram personal chats — 💡 Idea (added 2026-07-16)
+
+**What:** the other half of his chat life (WhatsApp bank covers only
+WhatsApp). Telegram Desktop → Settings → Advanced → Export chat data →
+machine-readable JSON, per-chat.
+
+**Likely approach:** building block #2, one `telegram_ingest.py` parser,
+same snapshot-replaces semantics as WhatsApp. Note the pleasant irony: the
+bot lives on Telegram but has no access to his other chats — export is the
+only clean path, same privacy selectivity applies.
+
+### Book / Kindle highlights — 💡 Idea (added 2026-07-16)
+
+**What:** what he's read and marked — lets the agent connect his own
+principles to what he's learning ("what did that book say about X?").
+
+**Likely approach:** BB#2. Kindle's `My Clippings.txt` (plug in the Kindle,
+copy one file) or a Readwise CSV export if he uses it. One parser module.
+
+**Gate note:** only enters if he actually highlights while reading — ask
+before building.
+
+### Finance (statements + subscriptions) — 💡 Idea (added 2026-07-16)
+
+**What:** bank/card statement CSVs and a subscription list — "what am I
+paying for monthly?", "how much did June cost?", spend patterns vs. the
+poker-brain instinct for EV.
+
+**Likely approach:** BB#2 (statement CSV/PDF exports). **Privacy-heaviest
+source on this list** — needs an explicit founder decision that financial
+data may live on the VPS at all (even though the box is his and hardened).
+Consider digest-only ingestion (monthly totals per category, not raw
+transactions) as the lower-risk first version.
+
+### People file (CRM-lite) — 💡 Idea (added 2026-07-16)
+
+**What:** a hand-curated `memory/people.md` — who's who, context on family,
+friends, collaborators ("remind me what Rahul does", "what did I promise
+Priya?"). Cross-references WhatsApp/DayOS mentions.
+
+**Likely approach:** no pipeline at all — either grow it via the existing
+`remember_fact` tool (a `## People` section in profile.md) or a dedicated
+file the founder edits. Cheapest possible source; the question is curation
+habit, not code.
 
 ### Trading journal(s) — 💡 Idea
 
