@@ -61,7 +61,7 @@ before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
 | Agent weekly digests | the AI's own weekly synthesis | native | 🔨 Built |
 | WhatsApp chats | chosen conversations, snapshot-based | BB#2 | 🔨 Built |
 | Wispr Flow dictations | everything voice-typed | Mac export → BB#2 | 🔨 Blocked on local Mac run |
-| Claude Code conversations | insights/decisions from his LLM sessions across all projects | Mac export → BB#2 (local `~/.claude` transcripts); claude.ai data export for web sessions | 💡 Idea (entry below) |
+| Claude Code conversations | insights/decisions distilled from his sessions across all projects | on-demand skill writes AI-condensed digest → git push → BB#1 mirror (new repo) | 💡 Idea, plan refined (entry below) |
 | YouTube — tagged videos | transcripts/summaries of videos he *chooses* to keep (send link to bot = the tag) | new link-drop pipeline (BB#2 sibling) | 💡 Idea (entry below) |
 | Google Drive notes | his Drive-synced notes | BB#1 (Drive API) | 📋 Planned (original Phase 2) |
 | Gmail | email history — agreements, bookings, receipts, threads | BB#2 (Takeout .mbox) first; BB#1 (API) only if refresh cadence demands it | 💡 Idea (entry below) |
@@ -288,49 +288,76 @@ Priya?"). Cross-references WhatsApp/DayOS mentions.
 file the founder edits. Cheapest possible source; the question is curation
 habit, not code.
 
-### Claude Code conversations — 💡 Idea (added 2026-07-16)
+### Claude Code conversations — 💡 Idea, plan refined 2026-07-16
 
 **What:** the founder's LLM session history — a lot of thinking, decisions,
-and derived insights live only inside Claude Code conversations. Goal:
-"what did we figure out about X in that session last month?" answerable
-from the brain.
+and derived insights live only inside Claude Code conversations (he uses
+the desktop app for Code sessions + plain chat + Cowork, not the terminal).
+Goal: "what did we figure out about X in that session last month?"
+answerable from the brain.
 
-**Where the data actually lives (three different places):**
-1. **Local CLI sessions (his Mac):** full transcripts as JSONL under
-   `~/.claude/projects/<project-slug>/*.jsonl` — one file per session,
-   machine-readable, already on disk. **Mac-only** → same constraint as
-   Wispr Flow: needs a local Claude Code session to build/validate against
-   the real files (CLAUDE.md lesson — don't rediscover this mid-task).
-2. **Cloud/web sessions (claude.ai/code):** transcripts live on Anthropic's
-   servers. claude.ai Settings → Privacy → *Export data* emails an archive
-   of conversations; **whether Claude Code web sessions are included needs
-   a one-time verification** by the founder requesting an export and
-   looking. No API for this today.
-3. **The distilled layer (already flowing):** per the playbook's own rules,
-   session insights are supposed to land in LEARNINGS.md / docs / CLAUDE.md
-   — and those already reach the brain via the playbook bank. So the
-   *highest-value* fraction is partially captured today; this integration
-   adds the searchable raw layer underneath.
+**Where the data actually lives — two axes, not one:** *product* (Code vs.
+plain chat vs. Cowork) crossed with *execution location* (session running
+against the founder's own Mac filesystem, vs. a cloud/remote sandbox —
+this very drafting session is an example of the latter: an ephemeral
+container, nothing touches his Mac). Only local-execution Claude Code
+sessions leave a file on his Mac (`~/.claude/projects/**/*.jsonl`); plain
+chat and Cowork are cloud-stored regardless, and remote/cloud Code sessions
+leave nothing local either. **Which mode his desktop-app sessions run in is
+something only he can check** (does the app show picking "this Mac" vs. a
+sandbox/environment?) — not assumed, not yet verified.
 
-**Likely approach (mirrors Wispr Flow exactly):**
-- `claude_export.py` — Mac-local, stdlib-only script: walk
-  `~/.claude/projects/**/*.jsonl`, emit one markdown file per session
-  (date, project, duration) into `~/ClaudeCodeExports/`, incremental via a
-  state file. **Filter hard:** keep user messages + the assistant's final
-  text per turn; drop tool calls/results and file dumps (raw transcripts
-  are enormous and mostly machine noise — the insight density is in the
-  prose). Optional launchd plist like Wispr's.
-- Feed via **BB#2**: upload the export to the bot; `claude_ingest.py`
-  parser module writes `memory/claude_code/<project>/<date>-<session>.md`.
-  Snapshot semantics, coverage dates, the usual.
-- Web sessions: whatever the claude.ai export verification finds — if
-  conversations.json includes them, one more parser handles that archive
-  format; if not, accept CLI-only coverage (the distilled layer still
-  catches web-session insights via docs).
+**Rejected approach:** a Mac-local `claude_export.py` walking raw JSONL
+(the Wispr Flow pattern) — raw transcripts are ~90%+ tool-call/file-dump
+noise; the signal is a handful of decisions and insights in the prose, and
+mechanical filtering can't reliably separate them. Also Mac-only, so it
+would miss every remote/cloud-executed session (including sessions like
+this one).
 
-**Order note:** club the Mac-local run with the pending Wispr Flow local
-session — one local session can validate both exports (same pattern, same
-machine).
+**Chosen approach — condense at the source via a skill, ship over git
+(works local or remote, sidesteps the execution-location question
+entirely):**
+1. A Claude Code **skill** (`.claude/skills/save-to-brain/SKILL.md`) run
+   on-demand (`/save-to-brain`) at the end of a session worth keeping.
+   Claude itself — with full session context already in hand — writes a
+   tight markdown digest: topic, key decisions, insights derived, open
+   threads. Same philosophy as `digests.py`'s AI-authored weekly synthesis,
+   applied per-session instead of per-week.
+2. The skill's last step: commit the digest and `git push` to one
+   dedicated collection repo (new, lightweight — e.g.
+   `instatank/session-digests` — not coupled to any one project's
+   lifecycle, since sessions span many repos). This works identically
+   whether the session executed on his Mac or in a cloud sandbox, since
+   both have git access — no export step, no Telegram upload, no Mac-only
+   constraint.
+3. VPS side: reuse `playbook_sync.py`'s git-mirror mechanism verbatim,
+   pointed at the new repo instead of time-tracker — same 2h timer, same
+   staleness pattern. New bot tools: `search_session_digests`,
+   `session_digest`.
+4. **Trigger stays on-demand, not automatic, for now** — confirm-first,
+   matching WhatsApp/YouTube: the founder decides what's worth keeping,
+   so the digest repo stays high-signal instead of filling with dead-end
+   debugging sessions. Upgrade path if wanted later: a Stop hook checked
+   into a repo's `.claude/settings.json` auto-fires the same skill in
+   every session against that repo, local or remote — an add-on, not a
+   redesign.
+
+**The distilled layer already flowing:** per the playbook's own rules,
+the *highest-value* fraction of session insights already lands in
+LEARNINGS.md / docs / CLAUDE.md, which already reach the brain via the
+playbook bank. This integration adds a searchable per-session layer
+underneath, at finer grain and without waiting for something to earn a
+LEARNINGS entry.
+
+**Open items before building:**
+- [ ] Founder: check the desktop app to determine local vs. remote
+      execution mode for his Code sessions (informs whether an automatic
+      Stop-hook upgrade could ever reach 100% local coverage; doesn't
+      block the on-demand skill either way).
+- [ ] Founder: name/create the destination repo for digests.
+- [ ] One-time: verify whether claude.ai's data-export includes plain
+      chat / Cowork history, if those are ever wanted too (lower priority
+      — Code sessions carry the technical insight density).
 
 ### YouTube — tagged videos — 💡 Idea (added 2026-07-16)
 

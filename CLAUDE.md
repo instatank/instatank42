@@ -53,10 +53,19 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - **Full source map added to `docs/BACKLOG.md`** (2026-07-16): one table of
   every candidate source (live → excluded) + scoping entries for Gmail,
   Calendar, Telegram exports, Kindle highlights, finance, people file —
-  plus (same day, founder ask) Claude Code conversations (Mac-local export
-  like Wispr; club the two local runs) and YouTube tagged videos (send
-  link to bot = the tag; link-drop pipeline, transcript fetch best-effort
-  from a VPS, manual-summary fallback).
+  plus (same day, founder ask) Claude Code conversations and YouTube tagged
+  videos.
+- **Claude Code conversations plan refined 2026-07-16**: not a Mac export —
+  local vs. remote/cloud execution is ambiguous for desktop-app sessions
+  (this session itself proves cloud-executed Code sessions exist, with zero
+  Mac footprint). Chosen approach instead: an on-demand skill
+  (`/save-to-brain`) that has Claude itself condense the session into a
+  markdown digest and git-push it to a new dedicated repo, mirrored into
+  the brain via the existing `playbook_sync.py` git-mirror pattern — works
+  whether the session ran locally or in the cloud, no export step needed.
+  Detail + open items: `docs/BACKLOG.md`.
+- YouTube tagged videos: send link to bot = the tag; link-drop pipeline,
+  transcript fetch best-effort from a VPS, manual-summary fallback.
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
