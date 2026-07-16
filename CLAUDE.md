@@ -37,7 +37,8 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `digests.py` writes an AI-authored weekly distillation to `memory/digests/`
   (agent's own lane, never overwrites mirrors) and delivers it via Telegram —
   Friday 18:00 IST timer (`weekly-digest.timer`) + on-demand `/digest` +
-  read tool `weekly_digest`. Goes live on the VPS after `git pull` + re-running
+  read tool `weekly_digest` (renamed `digest` 2026-07-16, Phase C). Goes
+  live on the VPS after `git pull` + re-running
   `setup_vps.sh` (installs the new timer). ~$0.02/week on Sonnet, inside the
   daily cap; failures are messaged to the founder ON Telegram (Rule 4).
 - **WhatsApp bank + file-drop ingestion (Phase 5, first source) code complete
@@ -101,9 +102,15 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   two ambient lines in the prompt snapshot — week pulse (this week's
   hours + top categories vs last week, from metrics.csv) + open-loops
   line (active count, oldest, never-closed count), placed before the day
-  bodies so the cap can't trim them. v2+B live after VPS `git pull` +
-  restart + `/sync`. **Phase C approved** (founder answers in the doc:
-  monthly synthesis on the 5th + `themes.md`, no quarterly) — next build.
+  bodies so the cap can't trim them. **Phase C built same day** (per
+  founder answers): monthly synthesis on the **5th, 18:00 IST**
+  (`monthly-digest.timer`, `digests.py --month --send`) + standing
+  `memory/digests/themes.md`, both from ONE Sonnet call split on a
+  `===THEMES===` marker (marker missing → themes.md untouched, never
+  destroyed); `/digest month [YYYY-MM]` on demand; read tool renamed
+  `weekly_digest` → **`digest`** (weeks + months + 'themes'). Everything
+  live after VPS `git pull` + `setup_vps.sh` re-run (installs the
+  monthly timer) + `/sync`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
   `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
@@ -218,9 +225,10 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `memory/playbook/` + `sync_status.json`
 - `playbook_store.py` — read side: search/doc lookup, staleness warnings,
   prompt note
-- `digests.py` — weekly synthesis: build input from the DayOS mirror, one
-  Sonnet call, write `memory/digests/<week>.md`, Telegram delivery, CLI
-  (`--send/--week/--status`)
+- `digests.py` — weekly + monthly syntheses and standing themes: build
+  input from the DayOS mirror (+ own weeklies for monthlies), one Sonnet
+  call each, write `memory/digests/<week>.md` / `months/<YYYY-MM>.md` /
+  `themes.md`, Telegram delivery, CLI (`--send/--week/--month/--status`)
 - `ingest.py` — generic Telegram file-drop pipeline (building block #2):
   parser registry + zip/text extraction + size cap; a new file-based source
   is one parser module added to `PARSERS`
@@ -268,5 +276,6 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `BUILD_BRIEF.md` — the filled build brief for the second brain (playbook rule)
 - `deploy/` — `setup_vps.sh` (idempotent root script), `telegram-agent.service`,
   `dayos-sync.service` + `.timer`, `weekly-digest.service` + `.timer`,
+  `monthly-digest.service` + `.timer` (the 5th, 18:00 IST),
   `youtube-autofetch.service` + `.timer`, `DEPLOY.md` (non-technical
   walkthrough)

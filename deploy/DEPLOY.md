@@ -377,19 +377,24 @@ confirmation (your call, 2026-07-16).
   two runs, then gives up on that one (visible in `/sync`) — share that link
   to the bot directly to use the paste buttons instead.
 
-## 10. The Friday synthesis — automatic, nothing to configure
+## 10. The Friday + monthly syntheses — automatic, nothing to configure
 
 Once steps 4–7 are done, every **Friday at 6pm IST** the agent writes a short
 synthesis of your week (numbers vs last week, patterns, open loops, one
-suggestion) and sends it to you on Telegram by itself. It costs about 2¢ a
-week and counts against the same daily budget cap as everything else.
+suggestion) and sends it to you on Telegram by itself. And on the **5th of
+every month at 6pm IST** it writes the month's story from its own weekly
+syntheses (trajectory, patterns-of-patterns, biggest open loop) and refreshes
+its standing list of themes that keep recurring across months. Together they
+cost about 10¢ a month and count against the same daily budget cap as
+everything else. (The monthly timer installs with a `setup_vps.sh` re-run,
+same as the others.)
 
-- Want one right now instead of waiting for Friday? Send **`/digest`** to the
-  bot.
-- Ask *"what did you make of my week?"* later — the agent can re-read its own
-  past syntheses.
-- If a Friday run fails, the agent messages you the error itself (and skips
-  politely if the day's budget cap is already spent).
+- Want one right now? Send **`/digest`** (this week) or **`/digest month`**
+  (last month + themes) to the bot.
+- Ask *"what did you make of my week?"*, *"how did June go?"*, or *"what are
+  my patterns?"* later — the agent re-reads its own past syntheses and themes.
+- If a scheduled run fails, the agent messages you the error itself (and
+  skips politely if the day's budget cap is already spent).
 
 ## 11. Troubleshooting
 

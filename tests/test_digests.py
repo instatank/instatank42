@@ -40,6 +40,7 @@ digests.STATUS_PATH = digests.DIGESTS_DIR / "status.json"
 import bot
 
 THIS_WEEK = digests.week_start_of(memory.now())
+LAST_MONTH = digests.resolve_month("last")
 
 
 def fake_client(reply_text="**The week in one line**\nSolid deep-work week."):
@@ -100,6 +101,51 @@ def test_generate():
     print("ok generate")
 
 
+def test_resolve_month():
+    assert digests.resolve_month("2026-06") == "2026-06"
+    assert digests.resolve_month("last month") == LAST_MONTH
+    assert digests.resolve_month("") == LAST_MONTH
+    assert digests.resolve_month("garbage") == ""
+    print("ok resolve month")
+
+
+def test_generate_month():
+    # a weekly synthesis inside last month + the DayOS month rollup feed the input
+    wk = digests.week_start_of(
+        memory.datetime.fromisoformat(LAST_MONTH + "-01") + digests.timedelta(days=10))
+    digests.DIGESTS_DIR.mkdir(parents=True, exist_ok=True)
+    digests.path_for(wk).write_text("wk synth: strong deep work\n", encoding="utf-8")
+    (dayos_store.DAYOS_DIR / "months").mkdir(parents=True, exist_ok=True)
+    (dayos_store.DAYOS_DIR / "months" / f"{LAST_MONTH}.md").write_text(
+        "# Month rollup\nDeep Work 40.0h\n", encoding="utf-8")
+    text = digests.build_month_input(LAST_MONTH)
+    assert "Deep Work 40.0h" in text
+    assert "strong deep work" in text
+    assert "themes file" in text
+
+    reply = ("**The month in one line**\nA grinding, honest month.\n"
+             "===THEMES===\n"
+             "- Ships in bursts (first seen 2026-06, last seen 2026-07)")
+    client = fake_client(reply)
+    result = digests.generate_month("last", client)
+    assert result["month"] == LAST_MONTH and result["themes_updated"]
+    assert client.calls[0]["max_tokens"] == digests.MAX_TOKENS_MONTH
+    stored = digests.load(LAST_MONTH)
+    assert "Agent-written monthly synthesis" in stored    # the opinion label
+    assert "grinding, honest month" in stored
+    assert "===THEMES===" not in stored                   # themes split out
+    themes = digests.load("themes")
+    assert "Standing themes" in themes and "Ships in bursts" in themes
+    status = json.loads(digests.STATUS_PATH.read_text())
+    assert status["month"] == LAST_MONTH and status["themes_updated"]
+
+    # a malformed reply (no marker) must never destroy the standing themes file
+    result = digests.generate_month("2025-12", fake_client("month text only, no marker"))
+    assert not result["themes_updated"]
+    assert "Ships in bursts" in digests.load("themes")
+    print("ok generate month")
+
+
 def test_budget_cap_blocks_generation():
     budget.add_spend(budget.DAILY_CAP_USD + 1)
     try:
@@ -114,11 +160,15 @@ def test_budget_cap_blocks_generation():
 
 def test_bot_wiring():
     names = [t["name"] for t in bot.current_tools()]
-    assert "weekly_digest" in names                       # a digest exists now
-    out = bot.handle_tool("weekly_digest", {"period": "this week"})
+    assert "digest" in names                              # a digest exists now
+    out = bot.handle_tool("digest", {"period": "this week"})
     assert "Solid deep-work week." in out
-    out = bot.handle_tool("weekly_digest", {"period": "last week"})
+    out = bot.handle_tool("digest", {"period": "last week"})
     assert "No synthesis written" in out
+    out = bot.handle_tool("digest", {"period": LAST_MONTH})
+    assert "grinding, honest month" in out
+    assert "Ships in bursts" in bot.handle_tool("digest", {"period": "themes"})
+    assert "No monthly synthesis" in bot.handle_tool("digest", {"period": "2025-01"})
     print("ok bot wiring")
 
 
@@ -149,6 +199,8 @@ if __name__ == "__main__":
         test_resolve_and_load_missing()
         test_build_input()
         test_generate()
+        test_resolve_month()
+        test_generate_month()
         test_budget_cap_blocks_generation()
         test_bot_wiring()
         test_send_telegram_chunks()

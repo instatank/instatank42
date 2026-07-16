@@ -45,7 +45,7 @@ very good reader.
 │                                                                                    │
 │  LAYER 2 — fetched on demand, only when THIS question needs it                     │
 │    • tool results: search_dayos / dayos_day / search_playbook /                    │
-│      search_whatsapp / weekly_digest ...                                           │
+│      search_whatsapp / digest ...                                                  │
 │    • each result capped ≈ 900 tokens; max 3 tool rounds per message                │
 │                                                                                    │
 └────────────────────────────────────────────────────────────────────────────────────┘

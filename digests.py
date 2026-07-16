@@ -1,21 +1,33 @@
-"""AI-written weekly synthesis — the agent's own lane of the second brain.
+"""AI-written syntheses — the agent's own lane of the second brain.
 
-Once a week (Friday 18:00 IST via systemd timer, or on demand via /digest in
-Telegram) the agent reads the week's DayOS mirror and writes a short
-distillation — patterns, deltas vs last week, open loops — to
-memory/digests/<week-sunday>.md. Digests are the agent's OPINION, clearly
-labeled, and never overwrite mirror data. The weekly_digest bot tool reads
-stored digests; only /digest and the timer spend tokens generating one.
+Weekly: every Friday 18:00 IST (systemd timer, or /digest in Telegram) the
+agent reads the week's DayOS mirror and writes a short distillation —
+patterns, deltas vs last week, open loops — to
+memory/digests/<week-sunday>.md.
 
-Cost guards: generation refuses when the daily budget cap is already hit, and
-its own cost is added to the same ledger as chat turns. One Sonnet call/week
-≈ $0.02. Failures are loud (Rule 4): the timer path reports errors to the
-founder ON Telegram itself, not just into a log file.
+Monthly (docs/DAYOS_ORGANIZATION.md Phase C, founder-approved 2026-07-16):
+on the 5th of each month (monthly-digest.timer, or /digest month) one call
+reads the previous month's weekly syntheses + the DayOS month rollup and
+writes memory/digests/months/YYYY-MM.md — the month's story — and refreshes
+memory/digests/themes.md, the standing list of patterns that recur across
+months (the compounding layer: a theme enters after two monthlies, retires
+when it stops appearing).
+
+Digests are the agent's OPINION, clearly labeled, and never overwrite
+mirror data. The `digest` bot tool reads stored files; only /digest and the
+timers spend tokens generating one.
+
+Cost guards: generation refuses when the daily budget cap is already hit,
+and its own cost is added to the same ledger as chat turns. One Sonnet
+call/week + one/month ≈ $0.10/month total. Failures are loud (Rule 4): the
+timer paths report errors to the founder ON Telegram itself, not just into
+a log file.
 """
 
 import argparse
 import json
 import os
+import re
 import sys
 from datetime import timedelta
 
@@ -29,8 +41,16 @@ STATUS_PATH = DIGESTS_DIR / "status.json"
 MODEL = os.environ.get("DIGEST_MODEL", "claude-sonnet-5")
 MAX_TOKENS = 900
 
+MAX_TOKENS_MONTH = 1200  # monthly synthesis + updated themes in one reply
+
 LABEL = ("*Agent-written weekly synthesis for the week of {week} — my own reading "
          "of your data, not your words.*\n\n")
+MONTH_LABEL = ("*Agent-written monthly synthesis for {ym} — my own reading of "
+               "your month, not your words.*\n\n")
+THEMES_LABEL = ("*Standing themes — recurring patterns I track across your "
+                "monthly syntheses, refreshed with each monthly (the 5th). "
+                "My reading, not your words.*\n\n")
+THEMES_MARKER = "===THEMES==="
 
 SYSTEM = """You write a weekly synthesis for one person: an ex-poker-pro solo \
 builder in New Delhi who thinks in expected value and hates cheerleading. You \
@@ -49,6 +69,32 @@ in progress, tie the suggestion to it.
 
 If the data is thin, say so in one line instead of inventing insight."""
 
+MONTH_SYSTEM = """You write a monthly synthesis for one person: an ex-poker-pro \
+solo builder in New Delhi who thinks in expected value and hates cheerleading. \
+You are given the month's DayOS rollup, your own weekly syntheses from that \
+month, your previous monthly synthesis, and your standing themes file.
+
+Reply in two parts separated by one line containing exactly
+===THEMES===
+
+Part 1 — at most 400 words of plain markdown with exactly these sections:
+**The month in one line** — its honest shape.
+**Numbers vs last month** — hours by the categories that moved, focus-task \
+rate, day ratings. Only real deltas; no padding.
+**The month's story** — 2-4 observations connecting the weeks: trajectory, \
+patterns-of-patterns, what changed mid-month.
+**Biggest open loop** — the one thing most worth closing next month.
+
+Part 2 — the UPDATED themes file, full replacement, one bullet per theme:
+"- <theme, one plain sentence> (first seen YYYY-MM, last seen YYYY-MM)"
+Carry existing themes forward (bump last-seen when the pattern shows this \
+month). Add a theme only once it has appeared in at least two monthly \
+syntheses. Drop a theme whose last-seen is three or more months old. If \
+nothing recurs yet, write exactly: (no recurring themes yet — needs at \
+least two months of data)
+
+If the data is thin, say so in one line instead of inventing insight."""
+
 
 def _log(msg: str) -> None:
     print(f"[weekly-digest] {msg}", flush=True)
@@ -63,8 +109,21 @@ def path_for(week_start: str):
     return DIGESTS_DIR / f"{week_start}.md"
 
 
+def month_path(ym: str):
+    return DIGESTS_DIR / "months" / f"{ym}.md"
+
+
+def themes_path():
+    return DIGESTS_DIR / "themes.md"
+
+
 def has_any() -> bool:
-    return DIGESTS_DIR.exists() and any(DIGESTS_DIR.glob("*-*-*.md"))
+    if not DIGESTS_DIR.exists():
+        return False
+    months = DIGESTS_DIR / "months"
+    return (any(DIGESTS_DIR.glob("*-*-*.md"))
+            or (months.exists() and any(months.glob("*.md")))
+            or themes_path().exists())
 
 
 def resolve_week(key: str) -> str:
@@ -80,11 +139,42 @@ def resolve_week(key: str) -> str:
         return ""
 
 
+def resolve_month(key: str) -> str:
+    """'' / 'last' / 'last month' -> the month that just ended (the timer runs
+    on the 5th, writing about the finished month); 'this month' -> current;
+    'YYYY-MM' -> itself. Unparseable -> ''."""
+    s = (key or "").strip().lower()
+    now = memory.now()
+    if s in ("", "last", "month", "last month"):
+        return (now.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
+    if s in ("this month", "current"):
+        return now.strftime("%Y-%m")
+    if re.fullmatch(r"\d{4}-\d{2}", s):
+        return s
+    return ""
+
+
 def load(period_key: str) -> str:
-    """Tool read path: return a stored digest, never generate (reads are free)."""
+    """Tool read path: return a stored synthesis (week / month / themes),
+    never generate (reads are free)."""
+    s = (period_key or "").strip().lower()
+    if s in ("themes", "theme", "patterns"):
+        p = themes_path()
+        if p.exists():
+            return p.read_text(encoding="utf-8")
+        return ("No themes file yet — it grows out of the monthly syntheses "
+                "(written the 5th of each month); needs at least one month of data.")
+    if s in ("last month", "this month", "month") or re.fullmatch(r"\d{4}-\d{2}", s):
+        ym = resolve_month(s)
+        p = month_path(ym)
+        if not p.exists():
+            return (f"No monthly synthesis for {ym} yet — one is written on the "
+                    "5th of each month, or on demand with /digest month.")
+        return p.read_text(encoding="utf-8")
     week = resolve_week(period_key)
     if not week:
-        return f"Could not parse '{period_key}' — use 'this week', 'last week' or a date."
+        return (f"Could not parse '{period_key}' — use 'this week', 'last week', "
+                "a date, 'YYYY-MM', 'last month', or 'themes'.")
     p = path_for(week)
     if not p.exists():
         return (f"No synthesis written for the week of {week} yet — one is "
@@ -183,6 +273,94 @@ def _write_status(update: dict) -> None:
     STATUS_PATH.write_text(json.dumps(status, indent=2), encoding="utf-8")
 
 
+# --- Monthly synthesis + standing themes (Phase C) --------------------------------
+
+def _month_weeks(ym: str) -> list:
+    """Week-start dates (Sundays) of the weekly syntheses that overlap month
+    ym — a week belongs to the month if any of its 7 days falls inside it."""
+    first = memory.datetime.fromisoformat(ym + "-01")
+    next_first = (first + timedelta(days=32)).replace(day=1)
+    lo = (first - timedelta(days=6)).strftime("%Y-%m-%d")
+    hi = (next_first - timedelta(days=1)).strftime("%Y-%m-%d")
+    weeks = sorted(p.stem for p in DIGESTS_DIR.glob("*-*-*.md"))
+    return [w for w in weeks if lo <= w <= hi]
+
+
+def build_month_input(ym: str) -> str:
+    """Everything the model sees for a monthly, size-capped: the month's DayOS
+    rollup, my own weekly syntheses from that month, the previous monthly,
+    and the current themes file (so it can carry themes forward)."""
+    parts = [f"# Input data for the monthly synthesis of {ym}"]
+
+    rollup = _read_if_exists(dayos_store.DAYOS_DIR / "months" / f"{ym}.md", 2500)
+    parts.append("## The month's DayOS rollup\n" + (rollup or "(no rollup — thin month)"))
+
+    week_parts = []
+    for w in _month_weeks(ym):
+        body = _read_if_exists(path_for(w), 1600)
+        if body:
+            week_parts.append(f"### Week of {w}\n{body}")
+    parts.append("## Your weekly syntheses this month\n"
+                 + ("\n".join(week_parts) or "(none written this month)"))
+
+    prev_first = memory.datetime.fromisoformat(ym + "-01") - timedelta(days=1)
+    prev_ym = prev_first.strftime("%Y-%m")
+    parts.append("## Last month's DayOS rollup (for deltas)\n" +
+                 (_read_if_exists(dayos_store.DAYOS_DIR / "months" / f"{prev_ym}.md", 1500)
+                  or "(none)"))
+    parts.append("## Your previous monthly synthesis\n" +
+                 (_read_if_exists(month_path(prev_ym), 1500) or "(none — this is the first)"))
+    parts.append("## Your current themes file\n" +
+                 (_read_if_exists(themes_path(), 1200) or "(none yet — this starts it)"))
+
+    return "\n\n".join(parts)
+
+
+def generate_month(month_key: str = "", client=None) -> dict:
+    """One Sonnet call -> memory/digests/months/<ym>.md + a refreshed
+    themes.md. Returns {month, path, text, cost, themes_updated}. Raises
+    BudgetCapError at the daily cap; a reply missing the ===THEMES===
+    marker keeps the month text but leaves themes.md untouched (never
+    destroy the standing file on a malformed reply)."""
+    if budget.over_daily_cap():
+        raise BudgetCapError(
+            f"daily budget cap (${budget.DAILY_CAP_USD:.2f}) already reached — "
+            "synthesis skipped, will not spend past the cap")
+    ym = resolve_month(month_key)
+    if not ym:
+        raise ValueError(f"could not parse month '{month_key}' — use YYYY-MM or 'last'")
+    if client is None:
+        import anthropic  # lazy: the timer script doesn't need it until here
+        client = anthropic.Anthropic()
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=MAX_TOKENS_MONTH,
+        system=MONTH_SYSTEM,
+        messages=[{"role": "user", "content": build_month_input(ym)}],
+    )
+    cost = budget.cost_of(MODEL, response.usage)
+    budget.add_spend(cost)
+    text = "".join(b.text for b in response.content if b.type == "text").strip()
+
+    if THEMES_MARKER in text:
+        month_part, themes_part = (s.strip() for s in text.split(THEMES_MARKER, 1))
+    else:
+        month_part, themes_part = text, ""
+    out = MONTH_LABEL.format(ym=ym) + month_part
+    month_path(ym).parent.mkdir(parents=True, exist_ok=True)
+    month_path(ym).write_text(out, encoding="utf-8")
+    themes_updated = bool(themes_part)
+    if themes_updated:
+        themes_path().write_text(THEMES_LABEL + themes_part + "\n", encoding="utf-8")
+    else:
+        _log("WARNING: reply had no ===THEMES=== block — themes.md left untouched")
+    _write_status({"last_month_success": memory.now().isoformat(), "month": ym,
+                   "month_cost_usd": round(cost, 4), "themes_updated": themes_updated})
+    _log(f"wrote {month_path(ym)} (${cost:.4f}, themes_updated={themes_updated})")
+    return {"month": ym, "path": str(month_path(ym)), "text": out, "cost": cost,
+            "themes_updated": themes_updated}
+
+
 # --- Telegram delivery (used by the Friday timer; /digest replies in-chat) -------
 
 def send_telegram(text: str) -> None:
@@ -201,10 +379,13 @@ def send_telegram(text: str) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Generate the weekly synthesis")
+    ap = argparse.ArgumentParser(description="Generate the weekly or monthly synthesis")
     ap.add_argument("--send", action="store_true",
-                    help="deliver to Telegram (the Friday timer path)")
+                    help="deliver to Telegram (the timer path)")
     ap.add_argument("--week", default="", help="week start YYYY-MM-DD (default: current)")
+    ap.add_argument("--month", nargs="?", const="last", default=None, metavar="YYYY-MM",
+                    help="write a MONTHLY synthesis + themes instead "
+                         "(default: the month that just ended; the 5th-of-month timer path)")
     ap.add_argument("--status", action="store_true", help="print status and exit")
     args = ap.parse_args()
 
@@ -215,8 +396,12 @@ def main() -> int:
         # Pre-configuration this is expected — skip green, same as the sync jobs.
         _log("not configured (no DayOS data or no API key) — skipping")
         return 0
+    kind = "Monthly" if args.month is not None else "Weekly"
     try:
-        result = generate_week(args.week)
+        if args.month is not None:
+            result = generate_month(args.month)
+        else:
+            result = generate_week(args.week)
         if args.send:
             send_telegram(result["text"])
             _log("delivered to Telegram")
@@ -227,7 +412,7 @@ def main() -> int:
         _log(str(e))
         if args.send:
             # free message — the skip itself must not be silent
-            send_telegram(f"Weekly synthesis skipped: {e}")
+            send_telegram(f"{kind} synthesis skipped: {e}")
         return 0
     except Exception as e:
         _write_status({"last_error": f"{type(e).__name__}: {e}",
@@ -235,7 +420,7 @@ def main() -> int:
         _log(f"FAILED: {type(e).__name__}: {e}")
         if args.send:
             try:  # loud failure on the channel he actually reads
-                send_telegram(f"Weekly synthesis FAILED: {type(e).__name__}: {e}")
+                send_telegram(f"{kind} synthesis FAILED: {type(e).__name__}: {e}")
             except Exception:
                 pass  # Telegram itself down — journalctl still has it
         return 1

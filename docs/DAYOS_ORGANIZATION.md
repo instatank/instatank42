@@ -5,10 +5,11 @@ second brain into an intelligent system that maximizes insight for minimal
 effort. This is the plan of record for how the DayOS bank gets smarter.
 `SECOND_BRAIN.md` stays the architecture for memory banks in general; this
 doc is specifically about what shapes the DayOS data takes and why. Status:
-**Phase A LIVE (founder-verified 2026-07-16); open-loops v2 + Phase B built
-+ offline-tested same day** (live after the next VPS `git pull` + restart +
-`/sync`); **Phase C approved by the founder's answers below** (monthly on
-the 5th + themes, no quarterly) — awaiting build.*
+**ALL THREE PHASES BUILT** — Phase A live (founder-verified 2026-07-16);
+open-loops v2, Phase B (prompt pulse), and Phase C (monthly + themes, per
+the founder's answers below) built + offline-tested same day. Live after
+VPS `git pull` + `setup_vps.sh` re-run (installs the monthly timer) +
+restart + `/sync`.*
 
 ## The idea in one paragraph
 
@@ -32,7 +33,7 @@ data he already produces.
 |---|---|---|---|
 | 0 · Raw | `raw/*.json` — exact Firestore copy | $0 | ✅ exists |
 | 1 · Lenses | mechanical views: by time ✅, by project ✅, **by tag, open loops, numbers table** | $0 (pure code in the existing sync) | **Phase A — ✅ built 2026-07-16** |
-| 2 · Distillation | the AI's opinion lane in `memory/digests/`: weekly ✅, **monthly + standing themes** | ~$0.02 per call | rest = **Phase C** |
+| 2 · Distillation | the AI's opinion lane in `memory/digests/`: weekly ✅, **monthly + standing themes** | ~$0.02 per call | **Phase C — ✅ built 2026-07-16** |
 | 3 · Ambient | what rides in every prompt: today+yesterday ✅, **week pulse + open loops** | ~100 tokens/msg | **Phase B — ✅ built 2026-07-16** |
 
 Standing rules across all layers (unchanged from `SECOND_BRAIN.md`): every
@@ -172,6 +173,25 @@ day with AI would cost real money, mostly restate the mechanical lenses,
 and bury signal in noise. Patterns live at week-and-up; that's where the
 model spends. Total AI cost of this whole plan: ≈ $1.50/year.
 
+**✅ Built 2026-07-16, offline-tested. As-built notes:**
+
+- One Sonnet call produces both parts: the monthly synthesis, then a
+  `===THEMES===` marker, then the full replacement themes file. If the
+  marker is missing from a reply, the month text is kept and `themes.md`
+  is left untouched — a malformed reply can never destroy the standing
+  file.
+- Timer: `monthly-digest.timer`, the **5th at 18:00 IST** (founder's
+  answer), running `digests.py --month --send` — same budget-cap guard
+  and loud-failure-to-Telegram path as the Friday one. Installed by a
+  `setup_vps.sh` re-run.
+- On demand: **`/digest month`** (last month) or `/digest month YYYY-MM`.
+- The read tool was renamed `weekly_digest` → **`digest`** — one tool now
+  reads weeks ('this week', 'last week', a date), months ('YYYY-MM',
+  'last month'), and 'themes'.
+- Inputs per monthly: the month's DayOS rollup, the weekly syntheses
+  overlapping that month, the previous monthly, and the current themes
+  file (so themes carry forward with first-seen/last-seen dates).
+
 ## The app (front-end) side — deliberately almost nothing
 
 The strongest property of this plan: **every phase derives from fields
@@ -205,7 +225,7 @@ reviews). No new logging habits, no schema change, no contract-doc churn.
 |---|---|---|---|
 | A — lenses ✅ built, founder-verified live | one session | $0 | "all my insights from June" = one tool call with full text; "what's still pending?" answers with ages |
 | B — pulse ✅ built | half a session (can ship with A) | ~100 tokens/msg | the bot brings up the week pulse or a stale loop unprompted, when relevant |
-| C — ladder (approved, next) | one session | ~$0.25/yr | "how did June go?" answered from the monthly; "what are my patterns?" from `themes.md` |
+| C — ladder ✅ built | one session | ~$0.25/yr | "how did June go?" answered from the monthly; "what are my patterns?" from `themes.md` |
 
 A → B → C, in that order: `metrics.csv` powers the pulse, and the weekly
 syntheses power the monthly. Each phase is independently useful; stopping

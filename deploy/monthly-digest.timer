@@ -1,0 +1,9 @@
+[Unit]
+Description=Monthly synthesis + themes on the 5th (18:00 IST)
+
+[Timer]
+OnCalendar=*-*-05 18:00:00 Asia/Kolkata
+Persistent=true
+
+[Install]
+WantedBy=timers.target

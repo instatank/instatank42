@@ -8,6 +8,7 @@ is capped per-turn and per-day (see budget.py).
 import asyncio
 import logging
 import os
+import re
 import sys
 import time
 from collections import deque
@@ -320,21 +321,25 @@ YOUTUBE_TOOLS = [
 ]
 
 
-# Weekly-synthesis read tool — reads stored digests only; generation (which
-# costs tokens) happens solely via /digest or the Friday timer.
+# Synthesis read tool — reads stored digests only; generation (which costs
+# tokens) happens solely via /digest or the Friday / 5th-of-month timers.
 DIGEST_TOOL = {
-    "name": "weekly_digest",
+    "name": "digest",
     "description": (
-        "Read one of YOUR OWN stored weekly syntheses — the distillation you "
-        "(the agent) wrote about the user's week: patterns, deltas, open loops. "
-        "Clearly your notes, not his words. Use for 'what did you make of my "
-        "week' or when past weeks' arcs matter."
+        "Read one of YOUR OWN stored syntheses — distillations you (the agent) "
+        "wrote about the user's data: patterns, deltas, open loops. Clearly "
+        "your notes, not his words. period='this week'/'last week'/a date = "
+        "that week's synthesis; 'YYYY-MM'/'last month' = a monthly synthesis "
+        "(written the 5th); 'themes' = the standing list of patterns that "
+        "recur across months. Use for 'what did you make of my week/month' "
+        "or 'what are my patterns'."
     ),
     "input_schema": {
         "type": "object",
         "properties": {
             "period": {"type": "string",
-                       "description": "'this week', 'last week', or a date in the week."}
+                       "description": ("'this week', 'last week', a date, "
+                                       "'YYYY-MM', 'last month', or 'themes'.")}
         },
         "required": ["period"],
     },
@@ -391,7 +396,7 @@ def handle_tool(name: str, args: dict) -> str:
             return youtube_store.search(args.get("query", ""))
         if name == "youtube_video":
             return youtube_store.video(args.get("name", ""))
-        if name == "weekly_digest":
+        if name == "digest":
             return digests.load(args.get("period", "this week"))
         return f"Unknown tool: {name}"
     except Exception as e:
@@ -791,9 +796,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(
         "Hi — I'm your agent. Just talk to me. /remember saves a fact, "
         "/spend shows today's cost, /sync refreshes the memory banks, "
-        "/digest writes this week's synthesis now. Send me a WhatsApp chat "
-        "export (.txt or .zip, no media) to add that conversation to the brain, "
-        "or a YouTube link to save that video's transcript."
+        "/digest writes this week's synthesis now (/digest month = the "
+        "monthly + themes). Send me a WhatsApp chat export (.txt or .zip, "
+        "no media) to add that conversation to the brain, or a YouTube "
+        "link to save that video's transcript."
     )
 
 
@@ -864,17 +870,28 @@ async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def cmd_digest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Generate (or regenerate) this week's synthesis right now and reply with
-    it. The Friday timer does the same thing unprompted."""
+    """/digest -> this week's synthesis, right now. /digest month [YYYY-MM]
+    (or /digest YYYY-MM) -> a monthly synthesis + refreshed themes. The
+    Friday and 5th-of-month timers do the same things unprompted."""
     if not authorized(update):
         return
     if not dayos_store.has_data():
         await update.message.reply_text(
             "No DayOS data synced yet — the synthesis is written from it. Run /sync first.")
         return
-    await update.message.reply_text("Writing this week's synthesis…")
+    args = [a.strip() for a in (context.args or []) if a.strip()]
+    monthly = bool(args) and (args[0].lower() in ("month", "monthly")
+                              or re.fullmatch(r"\d{4}-\d{2}", args[0]))
+    if monthly:
+        key = (args[1] if len(args) > 1 and args[0].lower() in ("month", "monthly")
+               else args[0] if re.fullmatch(r"\d{4}-\d{2}", args[0]) else "last")
+        await update.message.reply_text("Writing the monthly synthesis + themes…")
+        call = lambda: digests.generate_month(key, client)
+    else:
+        await update.message.reply_text("Writing this week's synthesis…")
+        call = lambda: digests.generate_week("", client)
     try:
-        result = await asyncio.to_thread(digests.generate_week, "", client)
+        result = await asyncio.to_thread(call)
     except digests.BudgetCapError as e:
         await send_reply(update, f"Skipped: {e}")
         return

@@ -73,6 +73,8 @@ cp "$APP_DIR/deploy/dayos-sync.service" /etc/systemd/system/
 cp "$APP_DIR/deploy/dayos-sync.timer" /etc/systemd/system/
 cp "$APP_DIR/deploy/weekly-digest.service" /etc/systemd/system/
 cp "$APP_DIR/deploy/weekly-digest.timer" /etc/systemd/system/
+cp "$APP_DIR/deploy/monthly-digest.service" /etc/systemd/system/
+cp "$APP_DIR/deploy/monthly-digest.timer" /etc/systemd/system/
 cp "$APP_DIR/deploy/youtube-autofetch.service" /etc/systemd/system/
 cp "$APP_DIR/deploy/youtube-autofetch.timer" /etc/systemd/system/
 systemctl daemon-reload
@@ -82,6 +84,7 @@ systemctl enable "$SERVICE_NAME"
 # prerequisites exist).
 systemctl enable --now dayos-sync.timer
 systemctl enable --now weekly-digest.timer
+systemctl enable --now monthly-digest.timer
 systemctl enable --now youtube-autofetch.timer
 
 # --- 7. Env file with secrets -------------------------------------------------

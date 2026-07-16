@@ -18,7 +18,7 @@ what was actually built and deployed.*
 | 0 | Deploy the bot | ✅ **Done** (founder-confirmed 2026-07-12) | Live on the VPS, in daily use. |
 | 1 | DayOS memory bank | ✅ **Live** (built 2026-07-07; founder-verified in use 2026-07-12) | One residual task below. |
 | 2 | Principles layer — playbook + LEARNINGS | ✅ **Live** (founder-verified 2026-07-12) | Bot quotes actual playbook rules. |
-| 3 | Distillation — AI weekly synthesis | 🔨 **Code built + tested** (2026-07-12) | `digests.py` + `weekly_digest` tool + `/digest`. Live after server `git pull` + `setup_vps.sh` re-run. |
+| 3 | Distillation — AI weekly synthesis | 🔨 **Code built + tested** (2026-07-12) | `digests.py` + the `digest` tool + `/digest`. Live after server `git pull` + `setup_vps.sh` re-run. Extended 2026-07-16 with the monthly + themes rung (Phase C below). |
 | 4 | Proactive loops — Friday delivery | 🔨 **Code built + tested** (2026-07-12) | `weekly-digest.timer`, Fri 18:00 IST, failures messaged to Telegram. Friday-only per founder decision; morning/evening nudges stay unbuilt until Friday earns it. |
 | 5 | New sources, by gate | 🔁 Ongoing | Tracked per-source in `BACKLOG.md`; gate below. First source through: **WhatsApp chat history** — 🔨 code built + tested 2026-07-12 (plus the shared file-drop ingestion pipeline, building block #2). Live after VPS `git pull` + first export upload. |
 
@@ -60,9 +60,9 @@ silent-failure defense actually fires. Ten minutes, one-time.
   founder asked for smarter organization of the DayOS bank itself. Adds
   mechanical lenses (tag views, open-loops ledger, `metrics.csv`), a
   week-pulse ambient line, and a monthly-synthesis + standing-themes rung
-  on top of this phase's weekly one. **Phase A live (founder-verified);
-  open-loops v2 + Phase B built 2026-07-16; Phase C approved (monthly on
-  the 5th + themes.md) — awaiting build.**
+  on top of this phase's weekly one. **All three phases built 2026-07-16
+  (A founder-verified live; open-loops v2 + B + C same day); C = monthly
+  synthesis on the 5th + themes.md, `digest` tool reads all of it.**
 
 ### Phase 4 — proactive loops (trust must precede this)
 
@@ -144,11 +144,12 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
       from the VPS's IP or the paste fallbacks are the norm.
 - [x] Founder reviewed `docs/DAYOS_ORGANIZATION.md` + answered all four
       questions (2026-07-16); Phase A verified live by him the same day.
-- [ ] Founder: VPS `git pull` + restart + `/sync` to take the open-loops
-      v2 rework + Phase B prompt pulse live.
-- [ ] Build Phase C of `docs/DAYOS_ORGANIZATION.md`: monthly synthesis on
-      the 5th of each month + standing `themes.md` (founder-approved
-      2026-07-16, config decided — just needs the session).
+- [x] Phase C built (2026-07-16): monthly synthesis on the 5th
+      (`monthly-digest.timer`) + standing `themes.md`; `weekly_digest`
+      tool renamed `digest` (weeks + months + themes); `/digest month`.
+- [ ] Founder: VPS `git pull` + `setup_vps.sh` re-run (installs the
+      monthly timer) + `/sync` to take open-loops v2 + Phase B pulse +
+      Phase C live.
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).

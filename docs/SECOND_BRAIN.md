@@ -22,7 +22,7 @@ embeddings — plain files and search, upgraded only if that demonstrably fails.
 | Conversation log | `memory/sessions/*.md` | live (Phase 1) | Dated log of every bot conversation; last 2 days fed as context |
 | **DayOS** | `memory/dayos/` | **live** (2026-07) | Journals, activity blocks, captures/notes, project sessions, learning log, ratings, reviews — his whole logged life |
 | **Playbook** | `memory/playbook/` | **live** (2026-07-12) | Read-only git mirror of his cross-project rules, lessons, North Star, curriculum, LEARNINGS ledger (tools: `search_playbook`, `playbook_doc`) |
-| **Agent digests** | `memory/digests/` | **built** (2026-07-12) | AI-written weekly syntheses — the agent's own opinion lane; written Fridays (or `/digest`), never overwrites mirrors; read via `weekly_digest` |
+| **Agent digests** | `memory/digests/` | **built** (2026-07-12; monthly + themes added 2026-07-16) | AI-written weekly syntheses, monthly syntheses (the 5th), and a standing themes file — the agent's own opinion lane; written Fridays / the 5th (or `/digest`, `/digest month`), never overwrites mirrors; read via the `digest` tool |
 | **WhatsApp** | `memory/whatsapp/` | **built** (2026-07-12) | Manual chat-export snapshots, ingested via Telegram file upload with confirm-first buttons (tools: `search_whatsapp`, `whatsapp_chat`); each re-export replaces that chat's snapshot |
 | **YouTube** | `memory/youtube/` | **built** (2026-07-16) | Tagged videos only (send a link to the bot = the tag): transcript or pasted summary per video, confirm-first (tools: `search_youtube`, `youtube_video`); re-sending a link replaces the entry |
 | Drive notes | `memory/drive/` (future) | planned | His Google-Drive-synced notes, mirrored read-only the same way |
