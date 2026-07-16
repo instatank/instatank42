@@ -56,15 +56,16 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   Calendar, Telegram exports, Kindle highlights, finance, people file —
   plus (same day, founder ask) Claude Code conversations and YouTube tagged
   videos.
-- **Claude Code conversations plan refined 2026-07-16**: not a Mac export —
-  local vs. remote/cloud execution is ambiguous for desktop-app sessions
-  (this session itself proves cloud-executed Code sessions exist, with zero
-  Mac footprint). Chosen approach instead: an on-demand skill
-  (`/save-to-brain`) that has Claude itself condense the session into a
-  markdown digest and git-push it to a new dedicated repo, mirrored into
-  the brain via the existing `playbook_sync.py` git-mirror pattern — works
-  whether the session ran locally or in the cloud, no export step needed.
-  Detail + open items: `docs/BACKLOG.md`.
+- **`/save-to-brain` skill LIVE** (2026-07-16): Claude Code sessions enter
+  the brain via an on-demand skill — Claude itself condenses the session
+  into a markdown digest and git-pushes it to **`instatank/2ndbrain`**
+  (founder-created storehouse repo; canonical skill + rules in its README;
+  first real digest already saved — push flow proven). A convenience
+  mirror of the skill lives in this repo's `.claude/skills/save-to-brain/`.
+  Chosen over a Mac export because desktop-app sessions may execute in
+  the cloud with zero Mac footprint. **Next step for this source: the
+  bot-side mirror bank** (playbook_sync pattern on 2ndbrain + read tools) —
+  scoped in `docs/BACKLOG.md`.
 - **YouTube tagged-videos bank code complete + tested offline** (2026-07-16,
   founder-approved plan): send a YouTube link to the bot = the tag.
   `youtube_ingest.py` (link detect, oEmbed metadata, caption scrape →
@@ -129,7 +130,8 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   to `.env`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
-  `tests/test_whatsapp.py`, `tests/test_youtube.py`, and `tests/test_backup.py`).
+  `tests/test_whatsapp.py`, `tests/test_youtube.py`, `tests/test_backup.py`,
+  and `tests/test_brain_backfill.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -278,6 +280,15 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `BACKUP_REPO_TOKEN`/`BACKUP_REPO_BRANCH`); working clone lives in
   `.brain-backup/` OUTSIDE memory/. CLI (`--status`). Rationale:
   `docs/DAYOS_ALIGNMENT.md`
+- `brain_backfill.py` — standalone Mac-local utility (NOT wired into the bot
+  or VPS): one-time backfill of past Claude Code sessions into the brain.
+  Walks `~/.claude/projects/**/*.jsonl`, strips tool/thinking noise, condenses
+  each via one Anthropic call (raw urllib, no SDK), writes a digest per session
+  into a local 2ndbrain clone (one commit, no push until reviewed). Skips
+  already-backfilled sessions via a `<!-- session-id -->` marker. `--list`/
+  `--dry-run` write nothing. UNVERIFIED like Wispr: JSONL schema guessed + only
+  finds LOCALLY-executed sessions, so `--list` on the Mac is the first real
+  test. Tests: `tests/test_brain_backfill.py`.
 - `wispr_export.py` — standalone Mac-local utility (NOT wired into the bot or
   VPS): exports Wispr Flow's dictation history from its local SQLite DB to
   `~/WisprFlowExports/full-history.{json,md}`, incremental via
@@ -291,10 +302,12 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   the first real export before this is trustworthy.
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
   `tests/test_digests.py`, `tests/test_whatsapp.py`, `tests/test_youtube.py`,
-  `tests/test_wispr_export.py`, `tests/test_backup.py` — offline tests, no
-  network (playbook sync + backup tests clone/push a local file:// repo; digest
-  tests fake the Anthropic client; wispr_export tests build a synthetic SQLite
-  fixture since the real schema is unknown)
+  `tests/test_wispr_export.py`, `tests/test_backup.py`,
+  `tests/test_brain_backfill.py` — offline tests, no network (playbook sync +
+  backup tests clone/push a local file:// repo; digest tests fake the
+  Anthropic client; wispr_export tests build a synthetic SQLite fixture since
+  the real schema is unknown; backfill tests use synthetic JSONL + a temp git
+  repo)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
 - `docs/DAYOS_ORGANIZATION.md` — the plan for organizing DayOS entries in
   the brain (tag views, open-loops ledger, metrics table, monthly
