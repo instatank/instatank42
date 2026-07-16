@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily YouTube auto-fetch from the DayOS learning log (06:30 IST)
+
+[Timer]
+OnCalendar=*-*-* 06:30:00 Asia/Kolkata
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

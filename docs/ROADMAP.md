@@ -111,6 +111,7 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 | 2026-07-12 | **`main` branch created** | Founder-approved; all prior `claude/*` branches merged into it. Sessions merge to `main` before ending. Default-branch flip in GitHub settings still owed by founder (one click). |
 | 2026-07-12 | **Proactive cadence: Friday-only first** | Daily briefs must be earned by the Friday loop proving useful. |
 | 2026-07-12 | **DayOS mirror approach confirmed** | Founder: "the mirror idea for time tracker/dayos sounds good to me" — matches what was built. |
+| 2026-07-16 | **YouTube links in the DayOS learning log auto-fetch SILENTLY, daily** | The one deliberate exception to confirm-first ingestion: logging a link in his own learning log is already the act of curation, so no Telegram confirmation and no success notification (option 2 of the fork offered; also his call that every-2h would be overkill — daily + on-`/sync` instead). Run crashes still hit the ⚠️ banner; per-video fetch failures retry 3× then park, visible in `/sync`. |
 
 ## Open items
 
@@ -127,11 +128,12 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
       file to the bot → press "Add to brain" (walkthrough:
       `deploy/DEPLOY.md` step 9). Phase 5's first source goes live with that
       button press.
-- [ ] Founder: same `git pull` + restart also enables YouTube tagging
-      (built 2026-07-16) — share any YouTube link to the bot and press the
-      button (walkthrough: `deploy/DEPLOY.md` § 9b). First real link also
-      answers whether transcript fetch works from the VPS's IP or the
-      paste-a-summary fallback is the norm.
+- [ ] Founder: same `git pull` + `setup_vps.sh` re-run also enables YouTube
+      tagging (built 2026-07-16; the re-run installs the daily auto-fetch
+      timer) — share any YouTube link to the bot, or just log one in the
+      DayOS learning page and `/sync` (walkthrough: `deploy/DEPLOY.md`
+      § 9b). First real link also answers whether transcript fetch works
+      from the VPS's IP or the paste fallbacks are the norm.
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).

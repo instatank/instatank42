@@ -17,6 +17,7 @@ import memory
 tmp = Path(tempfile.mkdtemp())
 memory.MEMORY_DIR = tmp
 
+import youtube_autofetch
 import youtube_ingest
 import youtube_store
 
@@ -25,6 +26,7 @@ for mod in (youtube_ingest, youtube_store):
     mod.VIDEOS_DIR = mod.YOUTUBE_DIR / "videos"
     mod.STATUS_PATH = mod.YOUTUBE_DIR / "sync_status.json"
 youtube_ingest.RAW_DIR = youtube_ingest.YOUTUBE_DIR / "raw"
+youtube_autofetch.WATCHED = [tmp / "dayos" / "learning.md"]
 
 import bot
 
@@ -87,6 +89,11 @@ def test_find_link():
     vid, url = youtube_ingest.find_link(f"great sizing vid https://youtu.be/{VID}")
     assert youtube_ingest.note_from(f"great sizing vid https://youtu.be/{VID}", url) \
         == "great sizing vid"
+    # several links in one text: order kept, duplicates collapsed
+    many = (f"https://youtu.be/aaaaaaaaaaa then https://youtu.be/bbbbbbbbbbb "
+            f"and again https://www.youtube.com/watch?v=aaaaaaaaaaa")
+    assert [v for v, _ in youtube_ingest.find_links(many)] == \
+        ["aaaaaaaaaaa", "bbbbbbbbbbb"]
     print("ok find link")
 
 
@@ -148,12 +155,21 @@ def test_summary_fallback_and_replace():
     md = (youtube_ingest.VIDEOS_DIR / f"{VID}.md").read_text(encoding="utf-8")
     assert "## Summary" in md and "manual summary" in md and "## Transcript" not in md
     assert youtube_ingest.load_status()["videos"][VID]["source"] == "summary"
-    # empty body refuses to save
-    try:
-        youtube_ingest.ingest("x" * 11, "t", "c", "   ", "summary")
-        raise AssertionError("expected ValueError")
-    except ValueError:
-        pass
+    # a pasted FULL transcript is labeled as a transcript, not a summary
+    youtube_ingest.ingest(VID, "Position Sizing Masterclass", "PokerEV",
+                          "[manual] full talk text here…", "pasted_transcript")
+    md = (youtube_ingest.VIDEOS_DIR / f"{VID}.md").read_text(encoding="utf-8")
+    assert "## Transcript" in md and "pasted by the user" in md
+    assert "manual summary" not in md
+    assert youtube_ingest.load_status()["videos"][VID]["source"] == "pasted_transcript"
+    # empty body / unknown source kind refuse to save
+    for args in (("x" * 11, "t", "c", "   ", "summary"),
+                 ("x" * 11, "t", "c", "text", "nonsense")):
+        try:
+            youtube_ingest.ingest(*args)
+            raise AssertionError("expected ValueError")
+        except ValueError:
+            pass
     # restore the transcript entry for the store tests
     all_working()
     info = youtube_ingest.fetch(VID)
@@ -195,6 +211,71 @@ def test_staleness_and_banner():
     print("ok staleness + banner")
 
 
+GOOD, BAD = "GoodVid1234", "BadVid12345"
+
+
+def autofetch_fake_get(url):
+    if "oembed" in url:
+        title = "Good Talk" if GOOD in url else "Bad Talk"
+        return json.dumps({"title": title, "author_name": "Chan"})
+    if "timedtext" in url:
+        return JSON3
+    if GOOD in url:
+        return WATCH_HTML
+    if BAD in url:
+        return "<html>no captions key</html>"
+    raise AssertionError(f"unexpected fetch: {url}")
+
+
+def test_autofetch():
+    log_path = youtube_autofetch.WATCHED[0]
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(
+        f"## 2026-07-15\n- watched https://youtu.be/{GOOD} on sizing\n"
+        f"- also https://www.youtube.com/watch?v={BAD}\n", encoding="utf-8")
+    youtube_ingest._http_get = autofetch_fake_get
+
+    # run 1: the fetchable video is saved silently; the other starts retrying
+    r = youtube_autofetch.run()
+    assert r["found"] == 2 and r["new"] == 2
+    assert r["saved"] == ["Good Talk"] and BAD in r["failed"] and not r["parked"]
+    md = (youtube_ingest.VIDEOS_DIR / f"{GOOD}.md").read_text(encoding="utf-8")
+    assert "auto-saved from the DayOS learning log" in md
+    assert youtube_ingest.load_status()["autofetch"]["attempts"][BAD] == 1
+    # a per-video failure is NOT bank breakage — no banner
+    assert youtube_store.staleness_note() == ""
+
+    # runs 2+3: saved video never refetched; the failing one parks after 3 tries
+    assert youtube_autofetch.run()["new"] == 1
+    r = youtube_autofetch.run()
+    assert r["parked"] == [BAD]
+    assert BAD in youtube_ingest.load_status()["autofetch"]["gave_up"]
+
+    # run 4: everything known or parked — nothing new, and says so
+    r = youtube_autofetch.run()
+    assert r["new"] == 0 and "nothing new" in youtube_autofetch.summary_line(r)
+
+    # a parked video can still be saved by sharing the link directly
+    youtube_ingest.ingest(BAD, "Bad Talk", "Chan", "pasted text of the talk",
+                          "pasted_transcript")
+    assert "Bad Talk" in youtube_store.video(BAD)
+
+    # the RUN itself crashing IS bank breakage: recorded, banner fires
+    real_scan = youtube_autofetch.scan
+    youtube_autofetch.scan = lambda: (_ for _ in ()).throw(OSError("disk gone"))
+    try:
+        youtube_autofetch.run()
+        raise AssertionError("expected OSError")
+    except OSError:
+        pass
+    assert "disk gone" in youtube_store.staleness_note()
+    youtube_autofetch.scan = real_scan
+    youtube_autofetch.run()  # a clean run clears the banner
+    assert youtube_store.staleness_note() == ""
+    all_working()
+    print("ok autofetch")
+
+
 def test_bot_wiring():
     names = [t.get("name") for t in bot.current_tools()]
     assert "search_youtube" in names and "youtube_video" in names
@@ -219,6 +300,7 @@ if __name__ == "__main__":
         test_store_reads()
         test_store_search()
         test_staleness_and_banner()
+        test_autofetch()
         test_bot_wiring()
         print("ALL YOUTUBE TESTS PASSED")
     finally:

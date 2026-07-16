@@ -30,6 +30,7 @@ import ingest
 import memory
 import playbook_store
 import whatsapp_store
+import youtube_autofetch
 import youtube_ingest
 import youtube_store
 
@@ -504,16 +505,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await send_reply(update, "Slowing down — too many messages in the last minute.")
         return
 
-    # Link-drop tagging: a message containing a YouTube link IS the tag —
+    # Link-drop tagging: a message containing YouTube link(s) IS the tag —
     # it goes to the ingest flow, not to Claude (and costs no API tokens).
     chat_id = update.effective_chat.id
-    link = youtube_ingest.find_link(user_text)
-    if link:
-        await handle_youtube_link(update, user_text, *link)
+    links = youtube_ingest.find_links(user_text)
+    if len(links) == 1:
+        await handle_youtube_link(update, user_text, *links[0])
+        return
+    if len(links) > 1:
+        await handle_youtube_batch(update, user_text, links)
         return
     pending_yt = pending_youtube.get(chat_id)
-    if pending_yt and pending_yt.get("awaiting_summary"):
-        await handle_youtube_summary(update, pending_yt, user_text)
+    if pending_yt and pending_yt.get("awaiting_paste"):
+        await handle_youtube_paste(update, pending_yt, user_text)
         return
 
     if budget.over_daily_cap():
@@ -557,7 +561,7 @@ async def handle_youtube_link(update: Update, user_text: str, vid: str, url: str
     pending_youtube[update.effective_chat.id] = {
         **info, "url": url,
         "note": youtube_ingest.note_from(user_text, url),
-        "awaiting_summary": False,
+        "awaiting_paste": None,
     }
     if info["transcript"]:
         words = len(info["transcript"].split())
@@ -571,31 +575,72 @@ async def handle_youtube_link(update: Update, user_text: str, vid: str, url: str
             "Re-sending this link later replaces the entry.",
             reply_markup=keyboard)
     else:
-        keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("I'll paste a summary", callback_data="yt:summary"),
-            InlineKeyboardButton("Discard", callback_data="yt:discard"),
-        ]])
+        # Manual fallbacks: full transcript (video page → ⋯ → Show transcript
+        # → copy) is the better save; a summary (e.g. Gemini's) also works.
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("I'll paste the transcript", callback_data="yt:transcript"),
+             InlineKeyboardButton("I'll paste a summary", callback_data="yt:summary")],
+            [InlineKeyboardButton("Discard", callback_data="yt:discard")],
+        ])
         await update.message.reply_text(
             f"“{title}” — {channel}. Couldn't fetch the transcript: "
-            f"{info['error']}. I can save the video with a summary you paste "
-            "instead (e.g. from Gemini's summarize button).",
+            f"{info['error']}. You can paste it yourself (on the video page: "
+            "⋯ → Show transcript → copy), or paste a summary (e.g. from "
+            "Gemini's summarize button).",
             reply_markup=keyboard)
 
 
-async def handle_youtube_summary(update: Update, pending: dict, user_text: str) -> None:
-    """The message after the 'I'll paste a summary' button = the summary."""
+async def handle_youtube_batch(update: Update, user_text: str, links: list) -> None:
+    """Several links in one message -> fetch all, one combined confirm.
+    Only the ones whose transcript fetched are saved on confirm; the rest are
+    listed so they can be re-sent individually for the paste fallback."""
+    await update.message.reply_text(
+        f"{len(links)} YouTube links — fetching them all…")
+    infos = []
+    for vid, _url in links:
+        infos.append(await asyncio.to_thread(youtube_ingest.fetch, vid))
+    ok = [i for i in infos if i["transcript"]]
+    bad = [i for i in infos if not i["transcript"]]
+    lines = [f"✓ “{i['title'] or i['vid']}” (~{len(i['transcript'].split())} words)"
+             for i in ok]
+    lines += [f"✗ “{i['title'] or i['vid']}” — {i['error']}" for i in bad]
+    if not ok:
+        await update.message.reply_text(
+            "None of the transcripts could be fetched:\n" + "\n".join(lines) +
+            "\n\nSend the links one at a time to use the paste-a-transcript/"
+            "summary fallback.")
+        return
+    pending_youtube[update.effective_chat.id] = {
+        "batch": ok,
+        "note": youtube_ingest.note_from(user_text, [u for _v, u in links]),
+        "awaiting_paste": None,
+    }
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton(f"Add {len(ok)} to brain", callback_data="yt:addbatch"),
+        InlineKeyboardButton("Discard", callback_data="yt:discard"),
+    ]])
+    tail = ("\n\nThe ✗ ones can't be batch-saved — send those links "
+            "individually to paste a transcript/summary.") if bad else ""
+    await update.message.reply_text(
+        "Here's what I fetched:\n" + "\n".join(lines) + tail, reply_markup=keyboard)
+
+
+async def handle_youtube_paste(update: Update, pending: dict, user_text: str) -> None:
+    """The message after a paste-fallback button = the transcript or summary
+    (which one is recorded in awaiting_paste, and labels the saved entry)."""
     if len(user_text.strip()) < 20:
         await update.message.reply_text(
-            "That looks too short for a summary — paste the summary text, or "
-            "send the link again to start over.")
+            "That looks too short — paste the text, or send the link again "
+            "to start over.")
         return
     pending_youtube.pop(update.effective_chat.id, None)
     try:
         result = await asyncio.to_thread(
             youtube_ingest.ingest, pending["vid"], pending["title"],
-            pending["channel"], user_text, "summary", "", pending.get("note", ""))
+            pending["channel"], user_text, pending["awaiting_paste"], "",
+            pending.get("note", ""))
     except Exception as e:
-        log.exception("YouTube summary save failed")
+        log.exception("YouTube paste save failed")
         youtube_ingest.record_error(str(e))
         await update.message.reply_text(f"Save FAILED: {e}")
         return
@@ -617,25 +662,36 @@ async def handle_youtube_button(update: Update, context: ContextTypes.DEFAULT_TY
         pending_youtube.pop(chat_id, None)
         await query.edit_message_text("Discarded — nothing was saved.")
         return
-    if query.data == "yt:summary":
-        pending["awaiting_summary"] = True
+    if query.data in ("yt:transcript", "yt:summary"):
+        pending["awaiting_paste"] = \
+            "pasted_transcript" if query.data == "yt:transcript" else "summary"
+        what = "transcript" if query.data == "yt:transcript" else "summary"
         await query.edit_message_text(
-            "Okay — paste the summary as your next message and I'll save it "
+            f"Okay — paste the {what} as your next message and I'll save it "
             "with the video's link.")
         return
     pending_youtube.pop(chat_id, None)
     await query.edit_message_text("Saving…")
-    try:
-        result = await asyncio.to_thread(
-            youtube_ingest.ingest, pending["vid"], pending["title"],
-            pending["channel"], pending["transcript"] or "", "transcript",
-            pending.get("lang", ""), pending.get("note", ""), pending.get("raw") or "")
-    except Exception as e:
-        log.exception("YouTube save failed")
-        youtube_ingest.record_error(str(e))
-        await query.edit_message_text(f"Save FAILED: {e}")
-        return
-    await query.edit_message_text(result)
+    batch = pending.get("batch") or [pending]
+    results, errors = [], []
+    for item in batch:
+        try:
+            results.append(await asyncio.to_thread(
+                youtube_ingest.ingest, item["vid"], item["title"],
+                item["channel"], item["transcript"] or "", "transcript",
+                item.get("lang", ""), pending.get("note", ""),
+                item.get("raw") or ""))
+        except Exception as e:
+            log.exception("YouTube save failed")
+            youtube_ingest.record_error(str(e))
+            errors.append(f"“{item.get('title') or item['vid']}”: {e}")
+    if len(batch) == 1:
+        text = results[0] if results else ""
+    else:
+        text = f"Saved {len(results)} of {len(batch)}:\n" + "\n".join(results)
+    if errors:
+        text += ("\n" if text else "") + "Save FAILED for:\n" + "\n".join(errors)
+    await query.edit_message_text(text or "Nothing was saved.")
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -767,6 +823,16 @@ async def cmd_sync(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         except Exception as e:
             log.exception("Playbook sync failed")
             lines.append(f"Playbook sync FAILED: {e}")
+    # DayOS learning-log links = tags (founder decision, silent auto-fetch):
+    # scan on every /sync too, so a freshly logged link lands without waiting
+    # for the daily timer.
+    if any(p.exists() for p in youtube_autofetch.WATCHED):
+        try:
+            result = await asyncio.to_thread(youtube_autofetch.run)
+            lines.append(youtube_autofetch.summary_line(result))
+        except Exception as e:  # already recorded to the bank status by run()
+            log.exception("YouTube auto-fetch failed")
+            lines.append(f"YouTube auto-fetch FAILED: {e}")
     await send_reply(update, "\n".join(lines))
 
 

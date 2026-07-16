@@ -57,18 +57,32 @@ class TranscriptUnavailable(Exception):
 
 # --- Link detection -------------------------------------------------------------
 
+def find_links(text: str) -> list:
+    """All YouTube links in a text -> [(video_id, matched_url)], first-seen
+    order, deduped by video id (the batch flow and the DayOS auto-fetch scan
+    both feed whole blobs of text through this)."""
+    matches = sorted((m.start(), m.group(1), m.group(0))
+                     for rx in _LINK_RES for m in rx.finditer(text or ""))
+    found, seen = [], set()
+    for _pos, vid, url in matches:
+        if vid not in seen:
+            seen.add(vid)
+            found.append((vid, url))
+    return found
+
+
 def find_link(text: str):
     """First YouTube link in a message -> (video_id, matched_url) or None."""
-    for rx in _LINK_RES:
-        m = rx.search(text or "")
-        if m:
-            return m.group(1), m.group(0)
-    return None
+    links = find_links(text)
+    return links[0] if links else None
 
 
-def note_from(text: str, url: str) -> str:
-    """Whatever the founder wrote around the link = his note on the video."""
-    return (text or "").replace(url, " ").strip()
+def note_from(text: str, urls) -> str:
+    """Whatever the founder wrote around the link(s) = his note on the video."""
+    out = text or ""
+    for url in ([urls] if isinstance(urls, str) else urls):
+        out = out.replace(url, " ")
+    return out.strip()
 
 
 # --- HTTP (single seam, so tests can fake the network) ---------------------------
@@ -209,17 +223,28 @@ def record_error(err: str) -> None:
     _save_status(status)
 
 
+SOURCE_LABELS = {
+    # what goes on the entry's "Source:" line, keyed by how the text arrived
+    "transcript": None,  # rendered with the language, below
+    "pasted_transcript": "full transcript (pasted by the user)",
+    "summary": "manual summary (pasted by the user — not a full transcript)",
+}
+
+
 def ingest(vid: str, title: str, channel: str, body: str,
            source: str, lang: str = "", note: str = "", raw: str = "") -> str:
     """Write one video's snapshot (replacing any earlier one) and update the
-    status file. `source` is 'transcript' or 'summary'; `body` is that text.
-    Returns the confirmation line for Telegram."""
+    status file. `source` is 'transcript' (auto-fetched), 'pasted_transcript'
+    or 'summary'; `body` is that text. Returns the confirmation line for
+    Telegram."""
     if not (body or "").strip():
         raise ValueError("nothing to save — empty transcript/summary")
+    if source not in SOURCE_LABELS:
+        raise ValueError(f"unknown source kind: {source}")
     title = title.strip() or f"YouTube video {vid}"
     saved = memory.now().strftime("%Y-%m-%d")
-    src_line = f"transcript ({lang})" if source == "transcript" else \
-        "manual summary (pasted by the user — not a full transcript)"
+    src_line = f"transcript ({lang})" if source == "transcript" \
+        else SOURCE_LABELS[source]
     lines = [
         f"# {title}",
         "",
@@ -230,7 +255,7 @@ def ingest(vid: str, title: str, channel: str, body: str,
     ]
     if note.strip():
         lines.append(f"- User's note when saving: {note.strip()}")
-    lines += ["", f"## {'Transcript' if source == 'transcript' else 'Summary'}",
+    lines += ["", f"## {'Summary' if source == 'summary' else 'Transcript'}",
               "", body.strip(), ""]
 
     VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
@@ -252,7 +277,8 @@ def ingest(vid: str, title: str, channel: str, body: str,
     status.pop("last_error_time", None)
     _save_status(status)
 
-    what = f"full transcript, ~{len(body.split())} words" if source == "transcript" \
-        else "your pasted summary"
+    what = {"transcript": f"full transcript, ~{len(body.split())} words",
+            "pasted_transcript": f"your pasted transcript, ~{len(body.split())} words",
+            "summary": "your pasted summary"}[source]
     return (f"Added to the brain: \"{title}\" ({channel.strip() or 'unknown channel'}) "
             f"— {what}. Ask me about it any time.")

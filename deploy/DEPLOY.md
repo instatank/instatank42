@@ -342,16 +342,40 @@ No setup for this one either — if the bot is running, it already works.
    you press it. Sending the same link again later replaces the entry.
 3. If it says it **couldn't fetch the transcript** (YouTube sometimes blocks
    requests from servers — expected now and then, maybe always; we find out
-   in practice): press **"I'll paste a summary"**, get a summary from
-   Gemini's summarize button (or write two lines yourself), and paste it as
-   your next message. The video is saved with your summary instead, clearly
-   marked as a summary rather than a transcript.
-4. Test it: *"what was that video about <topic> I sent you?"*
+   in practice), you get two fallback buttons:
+   - **"I'll paste the transcript"** — on the video's page press **⋯ → Show
+     transcript**, select it all, copy, and paste it as your next message.
+     Saved as the real transcript.
+   - **"I'll paste a summary"** — get a summary from Gemini's summarize
+     button (or write two lines yourself) and paste that. Saved clearly
+     marked as a summary, not a transcript.
+4. **Several at once:** paste multiple YouTube links in one message — the
+   bot fetches them all and gives you a single "Add N to brain" button
+   instead of one per video.
+5. Test it: *"what was that video about <topic> I sent you?"*
 
 **Notes:**
 - Only videos you deliberately send are saved — the agent never sees your
   watch history.
 - Transcript fetching is free (no API key, no per-video cost).
+
+### The hands-off way: log links in DayOS
+
+You can skip Telegram entirely: **paste a YouTube link into a learning
+entry in DayOS** (the learning sessions page). Once a day (6:30am, and on
+every `/sync`), the agent scans your learning log for YouTube links and
+saves any new video's transcript automatically — no buttons, no
+notifications. Logging the link in your own learning log *is* the
+confirmation (your call, 2026-07-16).
+
+- The daily 6:30am scan needs its timer installed once: re-run
+  `deploy/setup_vps.sh` (the same re-run that installs the Friday digest
+  timer). Until then, `/sync` runs the scan just as well.
+- `/sync` shows what the scan found each time; so does
+  `sudo -u agent venv/bin/python youtube_autofetch.py --status` on the server.
+- If a video's transcript can't be fetched, the scan retries it on the next
+  two runs, then gives up on that one (visible in `/sync`) — share that link
+  to the bot directly to use the paste buttons instead.
 
 ## 10. The Friday synthesis — automatic, nothing to configure
 

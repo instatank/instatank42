@@ -387,6 +387,24 @@ Telegram objects):**
   preference (manual>ASR, en>hi>other), rolling-caption dedup, degrade
   paths, replace semantics, store reads/search, banner, tool gating.
 
+**Added same day (founder asks, 2026-07-16):**
+- **Paste-the-full-transcript fallback** alongside paste-a-summary (video
+  page → ⋯ → Show transcript → copy); entries are labeled by how the text
+  arrived (`transcript` / `pasted_transcript` / `summary`) so a summary can
+  never masquerade as a transcript.
+- **Batch messages:** several links in one Telegram message → one combined
+  fetch + a single "Add N to brain" button; unfetchable ones are listed for
+  individual re-send.
+- **DayOS learning-log auto-fetch** (`youtube_autofetch.py` + daily
+  `youtube-autofetch.timer` 06:30 IST + a scan on every `/sync`): links
+  logged in DayOS's learning sessions page are fetched and saved with NO
+  confirmation and NO notification — the founder's explicit decision
+  (ROADMAP decision log 2026-07-16); logging the link is the tag. Failure
+  policy: per-video fetch failures retry across 3 runs then park
+  (visible in `/sync` and `--status`, deliberately not on the ⚠️ banner);
+  a crashed run does hit the banner. Watched location: the mirror's
+  `learning.md` only — widening it is a one-line change (`WATCHED`).
+
 **Honest caveat:** the transcript scrape is validated against the known
 watch-page format, NOT against live YouTube — this repo's sandbox proxy
 blocks youtube.com, so the first real fetch happens on the VPS. If YouTube

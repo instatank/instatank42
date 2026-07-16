@@ -71,9 +71,18 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   tools `search_youtube`/`youtube_video`; confirm-first buttons; when the
   transcript fetch fails (YouTube may block datacenter IPs — the sandbox
   proxy blocked it here, so the scrape is UNVERIFIED against live YouTube)
-  the bot offers the paste-a-summary fallback. Zero model calls in the
-  pipeline. Live after VPS `git pull` + restart (no new config);
-  walkthrough `deploy/DEPLOY.md` § 9b.
+  the bot offers paste-the-transcript / paste-a-summary fallbacks (entries
+  labeled by how the text arrived). Multi-link messages batch into one
+  confirm. Zero model calls in the pipeline. Live after VPS `git pull` +
+  re-run of `setup_vps.sh` (installs the new timer below); walkthrough
+  `deploy/DEPLOY.md` § 9b.
+- **DayOS learning-log links auto-fetch SILENTLY** (founder decision
+  2026-07-16, ROADMAP decision log — the one exception to confirm-first):
+  `youtube_autofetch.py` scans the DayOS mirror's `learning.md` daily
+  (`youtube-autofetch.timer`, 06:30 IST) and on every `/sync`; new links'
+  transcripts are saved with no confirmation/notification. Per-video fetch
+  failures retry 3 runs then park (in `/sync` output, NOT the banner); a
+  crashed run does hit the ⚠️ banner.
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
@@ -205,6 +214,9 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   JSON kept, status file
 - `youtube_store.py` — read side: search/video reads, save-failure
   warnings, prompt note
+- `youtube_autofetch.py` — silent daily scan of the DayOS mirror's
+  `learning.md` for YouTube links → fetch+save via youtube_ingest; retry/
+  park bookkeeping in the same status file; CLI (`--status`)
 - `wispr_export.py` — standalone Mac-local utility (NOT wired into the bot or
   VPS): exports Wispr Flow's dictation history from its local SQLite DB to
   `~/WisprFlowExports/full-history.{json,md}`, incremental via
@@ -233,4 +245,5 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `BUILD_BRIEF.md` — the filled build brief for the second brain (playbook rule)
 - `deploy/` — `setup_vps.sh` (idempotent root script), `telegram-agent.service`,
   `dayos-sync.service` + `.timer`, `weekly-digest.service` + `.timer`,
-  `DEPLOY.md` (non-technical walkthrough)
+  `youtube-autofetch.service` + `.timer`, `DEPLOY.md` (non-technical
+  walkthrough)
