@@ -24,6 +24,7 @@ embeddings — plain files and search, upgraded only if that demonstrably fails.
 | **Playbook** | `memory/playbook/` | **live** (2026-07-12) | Read-only git mirror of his cross-project rules, lessons, North Star, curriculum, LEARNINGS ledger (tools: `search_playbook`, `playbook_doc`) |
 | **Agent digests** | `memory/digests/` | **built** (2026-07-12) | AI-written weekly syntheses — the agent's own opinion lane; written Fridays (or `/digest`), never overwrites mirrors; read via `weekly_digest` |
 | **WhatsApp** | `memory/whatsapp/` | **built** (2026-07-12) | Manual chat-export snapshots, ingested via Telegram file upload with confirm-first buttons (tools: `search_whatsapp`, `whatsapp_chat`); each re-export replaces that chat's snapshot |
+| **YouTube** | `memory/youtube/` | **built** (2026-07-16) | Tagged videos only (send a link to the bot = the tag): transcript or pasted summary per video, confirm-first (tools: `search_youtube`, `youtube_video`); re-sending a link replaces the entry |
 | Drive notes | `memory/drive/` (future) | planned | His Google-Drive-synced notes, mirrored read-only the same way |
 | Spend | `memory/usage/*.json` | live (Phase 1) | Cost accounting (not model-visible) |
 

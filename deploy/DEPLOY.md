@@ -330,6 +330,29 @@ No server setup at all for this one — if the bot is running, it already works.
   chats you feed in.
 - Media (photos/voice notes) is never ingested; export *without* media.
 
+## 9b. Feed it YouTube videos — optional, 30 seconds per video
+
+No setup for this one either — if the bot is running, it already works.
+
+1. In the YouTube app, on a video worth keeping: **Share → Telegram → your
+   bot**. (Any message containing a YouTube link works — you can add a
+   comment around the link and it's saved as your note on the video.)
+2. The bot fetches the video's title and transcript and shows you what it
+   found, with two buttons. Press **Add to brain** — nothing is saved until
+   you press it. Sending the same link again later replaces the entry.
+3. If it says it **couldn't fetch the transcript** (YouTube sometimes blocks
+   requests from servers — expected now and then, maybe always; we find out
+   in practice): press **"I'll paste a summary"**, get a summary from
+   Gemini's summarize button (or write two lines yourself), and paste it as
+   your next message. The video is saved with your summary instead, clearly
+   marked as a summary rather than a transcript.
+4. Test it: *"what was that video about <topic> I sent you?"*
+
+**Notes:**
+- Only videos you deliberately send are saved — the agent never sees your
+  watch history.
+- Transcript fetching is free (no API key, no per-video cost).
+
 ## 10. The Friday synthesis — automatic, nothing to configure
 
 Once steps 4–7 are done, every **Friday at 6pm IST** the agent writes a short

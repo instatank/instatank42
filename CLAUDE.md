@@ -64,13 +64,21 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   the brain via the existing `playbook_sync.py` git-mirror pattern — works
   whether the session ran locally or in the cloud, no export step needed.
   Detail + open items: `docs/BACKLOG.md`.
-- YouTube tagged videos: send link to bot = the tag; link-drop pipeline,
-  transcript fetch best-effort from a VPS, manual-summary fallback.
+- **YouTube tagged-videos bank code complete + tested offline** (2026-07-16,
+  founder-approved plan): send a YouTube link to the bot = the tag.
+  `youtube_ingest.py` (link detect, oEmbed metadata, caption scrape →
+  timestamped markdown, snapshot per video id) + `youtube_store.py` + bot
+  tools `search_youtube`/`youtube_video`; confirm-first buttons; when the
+  transcript fetch fails (YouTube may block datacenter IPs — the sandbox
+  proxy blocked it here, so the scrape is UNVERIFIED against live YouTube)
+  the bot offers the paste-a-summary fallback. Zero model calls in the
+  pipeline. Live after VPS `git pull` + restart (no new config);
+  walkthrough `deploy/DEPLOY.md` § 9b.
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
-  and `tests/test_whatsapp.py`).
+  `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -191,6 +199,12 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   snapshot writer into `memory/whatsapp/`
 - `whatsapp_store.py` — read side: search/chat reads, coverage notes,
   ingest-failure warnings, prompt note
+- `youtube_ingest.py` — link-drop write side: YouTube URL detection, oEmbed
+  metadata + best-effort caption scrape (stdlib only, no API key), snapshot
+  writer `memory/youtube/videos/<id>.md` (re-send replaces), raw caption
+  JSON kept, status file
+- `youtube_store.py` — read side: search/video reads, save-failure
+  warnings, prompt note
 - `wispr_export.py` — standalone Mac-local utility (NOT wired into the bot or
   VPS): exports Wispr Flow's dictation history from its local SQLite DB to
   `~/WisprFlowExports/full-history.{json,md}`, incremental via
@@ -203,7 +217,7 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   validate/fix the guessed column map and detected timestamp epoch, and do
   the first real export before this is trustworthy.
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
-  `tests/test_digests.py`, `tests/test_whatsapp.py`,
+  `tests/test_digests.py`, `tests/test_whatsapp.py`, `tests/test_youtube.py`,
   `tests/test_wispr_export.py` — offline tests, no network (playbook sync
   tests clone a local file:// repo; digest tests fake the Anthropic client;
   wispr_export tests build a synthetic SQLite fixture since the real schema

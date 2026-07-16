@@ -62,7 +62,7 @@ before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
 | WhatsApp chats | chosen conversations, snapshot-based | BB#2 | 🔨 Built |
 | Wispr Flow dictations | everything voice-typed | Mac export → BB#2 | 🔨 Blocked on local Mac run |
 | Claude Code conversations | insights/decisions distilled from his sessions across all projects | on-demand skill writes AI-condensed digest → git push → BB#1 mirror (new repo) | 💡 Idea, plan refined (entry below) |
-| YouTube — tagged videos | transcripts/summaries of videos he *chooses* to keep (send link to bot = the tag) | new link-drop pipeline (BB#2 sibling) | 💡 Idea (entry below) |
+| YouTube — tagged videos | transcripts/summaries of videos he *chooses* to keep (send link to bot = the tag) | link-drop pipeline (BB#2 sibling) | 🔨 Code built + tested offline (2026-07-16) |
 | Google Drive notes | his Drive-synced notes | BB#1 (Drive API) | 📋 Planned (original Phase 2) |
 | Gmail | email history — agreements, bookings, receipts, threads | BB#2 (Takeout .mbox) first; BB#1 (API) only if refresh cadence demands it | 💡 Idea (entry below) |
 | Google Calendar | commitments, appointments, recurring blocks | BB#1 (ICS/API) | 💡 Idea (entry below) |
@@ -359,40 +359,51 @@ LEARNINGS entry.
       chat / Cowork history, if those are ever wanted too (lower priority
       — Code sessions carry the technical insight density).
 
-### YouTube — tagged videos — 💡 Idea (added 2026-07-16)
+### YouTube — tagged videos — 🔨 Code built + tested offline (2026-07-16); awaiting VPS `git pull` + first real link
 
 **What:** NOT watch history (that stays ⏸️ — fails the weekly-use test).
 This is *deliberate capture*: the founder tags a specific video and its
 transcript (or at minimum a summary) enters the brain. "What was that
 video about position sizing I saved?"
 
-**The tag = send the link to the bot.** No playlists, no YouTube account
-plumbing: he shares the YouTube URL to the Telegram bot (Share → Telegram →
-bot — two taps from the YouTube app). The bot recognizes a YouTube link,
-fetches title + transcript, shows a preview, and writes to the brain only
-after the "Add to brain" button — the exact confirm-first UX WhatsApp
-ingestion already has. A new **link-drop pipeline** beside `ingest.py`'s
-file-drop (a URL-handler sibling; reuses the confirm-first button code).
+**Built (2026-07-16, offline-tested + handler flows driven with fake
+Telegram objects):**
+- `youtube_ingest.py` — link detection (watch/youtu.be/shorts/live/embed/
+  music URL shapes), oEmbed metadata fetch (robust path), caption-track
+  scrape off the watch page + json3 → timestamped markdown paragraphs
+  (best-effort path, every failure mode mapped to a plain-language reason),
+  snapshot writer `memory/youtube/videos/<video-id>.md` + raw caption JSON
+  under `memory/youtube/raw/` + `sync_status.json`. Re-sending a link
+  replaces the entry. Text around the link = the founder's note, saved
+  with the video. Zero Anthropic cost (no model call in the pipeline).
+- Bot flow: YouTube link in any message → intercepted before Claude (the
+  link IS the tag; costs no tokens) → fetch → preview + confirm-first
+  buttons. Transcript fetched → **Add to brain**/Discard; fetch failed →
+  **"I'll paste a summary"**/Discard, next message stored as the summary
+  (marked `manual summary`, never passable as a transcript).
+- `youtube_store.py` + tools `search_youtube` / `youtube_video`; save
+  failures ride the health banner; prompt note lists recent saves.
+- `tests/test_youtube.py` — offline (HTTP seam faked): link shapes, track
+  preference (manual>ASR, en>hi>other), rolling-caption dedup, degrade
+  paths, replace semantics, store reads/search, banner, tool gating.
 
-**Transcript fetch, in fallback order:**
-1. `youtube-transcript-api` (no API key) or `yt-dlp --write-auto-subs
-   --skip-download` — grabs YouTube's own captions incl. auto-generated.
-   **Known risk:** YouTube increasingly blocks these fetches from
-   datacenter IPs, and the bot runs on a Hetzner VPS — this may work, work
-   intermittently, or not work; must be treated as best-effort, never
-   assumed. Failure is loud (the bot says so in the preview), not silent.
-2. **Manual fallback (his Gemini idea, generalized):** if the fetch fails,
-   the bot replies "couldn't fetch the transcript — paste a summary and
-   I'll store that instead." He hits Gemini's summarize, pastes it; the
-   entry stores link + title + summary, marked `source: manual summary`.
-   This path needs zero fragile dependencies and works from day one.
-3. Optional polish: a one-call Haiku/Sonnet TL;DR written at the top of
-   each stored transcript (~a cent, inside the daily cap) so search hits
-   read well.
+**Honest caveat:** the transcript scrape is validated against the known
+watch-page format, NOT against live YouTube — this repo's sandbox proxy
+blocks youtube.com, so the first real fetch happens on the VPS. If YouTube
+blocks the VPS's IP too, the failure is loud and the summary fallback is
+the designed path (deploy/DEPLOY.md § 9b).
 
-**Bank shape:** `memory/youtube/<video-id>.md` — title, channel, date
-saved, URL, summary, transcript. Read tools: `search_youtube` +
-`youtube_video` (or fold into cross-bank search once that exists).
+**Still needs:** VPS `git pull` + restart (no new config, no new timer),
+then share any YouTube link to the bot and press the button.
+
+**Design notes (as built):** the tag = sharing the URL to the bot (Share →
+Telegram → bot, two taps from the YouTube app) — no playlists, no YouTube
+account plumbing. Transcript fetch is a hand-rolled stdlib scrape (oEmbed
+for metadata + watch-page caption tracks; deliberately no
+youtube-transcript-api/yt-dlp dependency — same raw-HTTP ethos as
+`dayos_client.py`, and those libraries break against IP blocks just the
+same). Optional future polish: a one-call Haiku TL;DR atop each stored
+transcript (~a cent) so search hits read better.
 
 **Gate check:** passes — the tag action itself proves intent; nothing
 enters without him choosing it, so every stored video is by definition

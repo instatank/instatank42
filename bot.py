@@ -30,6 +30,8 @@ import ingest
 import memory
 import playbook_store
 import whatsapp_store
+import youtube_ingest
+import youtube_store
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -254,6 +256,44 @@ WHATSAPP_TOOLS = [
 ]
 
 
+# YouTube memory-bank tools — read the per-video snapshots youtube_ingest.py
+# writes when the founder sends the bot a video link (link-drop tagging).
+YOUTUBE_TOOLS = [
+    {
+        "name": "search_youtube",
+        "description": (
+            "Search the transcripts/summaries of YouTube videos the user chose "
+            "to save (he tags a video by sending its link to this bot). Use for "
+            "'that video about X I saved/sent you'. A single '#tag' query "
+            "matches that exact tag only; any other query requires ALL words. "
+            "Results are labeled with the video's title, newest saves first."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search words, or one '#tag'."}
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "youtube_video",
+        "description": (
+            "Read one saved YouTube video's full entry — its transcript (or the "
+            "user's pasted summary, when marked so), channel, save date, and any "
+            "note he added. Match by title words or video id."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "description": "Title words or the video id."}
+            },
+            "required": ["name"],
+        },
+    },
+]
+
+
 # Weekly-synthesis read tool — reads stored digests only; generation (which
 # costs tokens) happens solely via /digest or the Friday timer.
 DIGEST_TOOL = {
@@ -288,6 +328,8 @@ def current_tools() -> list:
         tools += PLAYBOOK_TOOLS
     if whatsapp_store.has_data():
         tools += WHATSAPP_TOOLS
+    if youtube_store.has_data():
+        tools += YOUTUBE_TOOLS
     if digests.has_any():
         tools.append(DIGEST_TOOL)
     return tools
@@ -317,6 +359,10 @@ def handle_tool(name: str, args: dict) -> str:
             return whatsapp_store.search(args.get("query", ""), args.get("chat", ""))
         if name == "whatsapp_chat":
             return whatsapp_store.chat(args.get("name", ""), args.get("month", ""))
+        if name == "search_youtube":
+            return youtube_store.search(args.get("query", ""))
+        if name == "youtube_video":
+            return youtube_store.video(args.get("name", ""))
         if name == "weekly_digest":
             return digests.load(args.get("period", "this week"))
         return f"Unknown tool: {name}"
@@ -330,7 +376,7 @@ def health_banner() -> str:
     memory-enforced). Verified necessary: the model happily answered from a
     broken bank's mirror without relaying the warning it was given."""
     notes = [n for n in (dayos_store.staleness_note(), playbook_store.staleness_note(),
-                         whatsapp_store.staleness_note()) if n]
+                         whatsapp_store.staleness_note(), youtube_store.staleness_note()) if n]
     return "\n".join(notes)
 
 
@@ -343,6 +389,10 @@ recent_msgs: dict[int, deque] = {}
 # chat_id -> a detected-but-unconfirmed file upload (confirm-first ingestion;
 # in-memory only — a bot restart drops it and the file just gets re-sent)
 pending_ingests: dict[int, dict] = {}
+# chat_id -> a fetched-but-unconfirmed YouTube link (same confirm-first rule;
+# "awaiting_summary" means the founder pressed the fallback button and the
+# next plain message is the summary to store)
+pending_youtube: dict[int, dict] = {}
 
 COMPLEX_HINTS = (
     "plan", "analyze", "analyse", "strategy", "strategic", "tradeoff",
@@ -381,6 +431,9 @@ def build_system() -> list:
     wa_note = whatsapp_store.prompt_note()
     if wa_note:
         parts.append({"type": "text", "text": wa_note})
+    yt_note = youtube_store.prompt_note()
+    if yt_note:
+        parts.append({"type": "text", "text": yt_note})
     return parts
 
 
@@ -450,6 +503,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if rate_limited(update.effective_user.id):
         await send_reply(update, "Slowing down — too many messages in the last minute.")
         return
+
+    # Link-drop tagging: a message containing a YouTube link IS the tag —
+    # it goes to the ingest flow, not to Claude (and costs no API tokens).
+    chat_id = update.effective_chat.id
+    link = youtube_ingest.find_link(user_text)
+    if link:
+        await handle_youtube_link(update, user_text, *link)
+        return
+    pending_yt = pending_youtube.get(chat_id)
+    if pending_yt and pending_yt.get("awaiting_summary"):
+        await handle_youtube_summary(update, pending_yt, user_text)
+        return
+
     if budget.over_daily_cap():
         await send_reply(
             update,
@@ -458,7 +524,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         )
         return
 
-    chat_id = update.effective_chat.id
     history = histories.setdefault(chat_id, [])
     history.append({"role": "user", "content": user_text})
     model = pick_model(user_text)
@@ -478,6 +543,99 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     banner = health_banner()
     prefix = f"⚠️ {banner}\n\n" if banner else ""
     await send_reply(update, prefix + (reply or "(empty reply)"))
+
+
+async def handle_youtube_link(update: Update, user_text: str, vid: str, url: str) -> None:
+    """Link-drop ingestion: fetch title + transcript (best effort), preview,
+    and wait for a button press — nothing enters the brain silently. When the
+    transcript can't be fetched (YouTube blocks datacenter IPs sometimes),
+    offer the fallback: the founder pastes a summary instead."""
+    await update.message.reply_text("YouTube link — fetching the video's info…")
+    info = await asyncio.to_thread(youtube_ingest.fetch, vid)
+    title = info["title"] or f"video {vid}"
+    channel = info["channel"] or "unknown channel"
+    pending_youtube[update.effective_chat.id] = {
+        **info, "url": url,
+        "note": youtube_ingest.note_from(user_text, url),
+        "awaiting_summary": False,
+    }
+    if info["transcript"]:
+        words = len(info["transcript"].split())
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("Add to brain", callback_data="yt:add"),
+            InlineKeyboardButton("Discard", callback_data="yt:discard"),
+        ]])
+        await update.message.reply_text(
+            f"“{title}” — {channel}. Transcript fetched "
+            f"({info['lang']}, ~{words} words). Save it to the brain? "
+            "Re-sending this link later replaces the entry.",
+            reply_markup=keyboard)
+    else:
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("I'll paste a summary", callback_data="yt:summary"),
+            InlineKeyboardButton("Discard", callback_data="yt:discard"),
+        ]])
+        await update.message.reply_text(
+            f"“{title}” — {channel}. Couldn't fetch the transcript: "
+            f"{info['error']}. I can save the video with a summary you paste "
+            "instead (e.g. from Gemini's summarize button).",
+            reply_markup=keyboard)
+
+
+async def handle_youtube_summary(update: Update, pending: dict, user_text: str) -> None:
+    """The message after the 'I'll paste a summary' button = the summary."""
+    if len(user_text.strip()) < 20:
+        await update.message.reply_text(
+            "That looks too short for a summary — paste the summary text, or "
+            "send the link again to start over.")
+        return
+    pending_youtube.pop(update.effective_chat.id, None)
+    try:
+        result = await asyncio.to_thread(
+            youtube_ingest.ingest, pending["vid"], pending["title"],
+            pending["channel"], user_text, "summary", "", pending.get("note", ""))
+    except Exception as e:
+        log.exception("YouTube summary save failed")
+        youtube_ingest.record_error(str(e))
+        await update.message.reply_text(f"Save FAILED: {e}")
+        return
+    await update.message.reply_text(result)
+
+
+async def handle_youtube_button(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """The confirm/fallback/discard press for a pending YouTube link."""
+    query = update.callback_query
+    if not query or not query.from_user or str(query.from_user.id) != ALLOWED_USER_ID:
+        return
+    await query.answer()
+    chat_id = query.message.chat_id if query.message else None
+    pending = pending_youtube.get(chat_id)
+    if pending is None:
+        await query.edit_message_text("Nothing pending (the bot may have restarted) — send the link again.")
+        return
+    if query.data == "yt:discard":
+        pending_youtube.pop(chat_id, None)
+        await query.edit_message_text("Discarded — nothing was saved.")
+        return
+    if query.data == "yt:summary":
+        pending["awaiting_summary"] = True
+        await query.edit_message_text(
+            "Okay — paste the summary as your next message and I'll save it "
+            "with the video's link.")
+        return
+    pending_youtube.pop(chat_id, None)
+    await query.edit_message_text("Saving…")
+    try:
+        result = await asyncio.to_thread(
+            youtube_ingest.ingest, pending["vid"], pending["title"],
+            pending["channel"], pending["transcript"] or "", "transcript",
+            pending.get("lang", ""), pending.get("note", ""), pending.get("raw") or "")
+    except Exception as e:
+        log.exception("YouTube save failed")
+        youtube_ingest.record_error(str(e))
+        await query.edit_message_text(f"Save FAILED: {e}")
+        return
+    await query.edit_message_text(result)
 
 
 async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -551,7 +709,8 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "Hi — I'm your agent. Just talk to me. /remember saves a fact, "
         "/spend shows today's cost, /sync refreshes the memory banks, "
         "/digest writes this week's synthesis now. Send me a WhatsApp chat "
-        "export (.txt or .zip, no media) to add that conversation to the brain."
+        "export (.txt or .zip, no media) to add that conversation to the brain, "
+        "or a YouTube link to save that video's transcript."
     )
 
 
@@ -664,6 +823,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
     app.add_handler(CallbackQueryHandler(handle_ingest_button, pattern=r"^ingest:"))
+    app.add_handler(CallbackQueryHandler(handle_youtube_button, pattern=r"^yt:"))
     log.info("Bot starting (models: %s / %s, daily cap $%.2f)", HAIKU, SONNET, budget.DAILY_CAP_USD)
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

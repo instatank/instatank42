@@ -127,6 +127,11 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
       file to the bot → press "Add to brain" (walkthrough:
       `deploy/DEPLOY.md` step 9). Phase 5's first source goes live with that
       button press.
+- [ ] Founder: same `git pull` + restart also enables YouTube tagging
+      (built 2026-07-16) — share any YouTube link to the bot and press the
+      button (walkthrough: `deploy/DEPLOY.md` § 9b). First real link also
+      answers whether transcript fetch works from the VPS's IP or the
+      paste-a-summary fallback is the norm.
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).
