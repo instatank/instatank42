@@ -361,6 +361,25 @@ LEARNINGS entry.
   the push needs anyway — the skill says to use add_repo); local Mac
   sessions need the one-time copy below.
 
+**Backfilling old sessions — `brain_backfill.py` built (2026-07-16):**
+A Mac-local batch tool (stdlib only, like `wispr_export.py` — NOT wired into
+the bot/VPS) for the "I have a lot of pre-skill sessions to import" case.
+Walks Claude Code's on-disk transcripts (`~/.claude/projects/**/*.jsonl`),
+strips tool-call/tool-result/thinking noise (keeping the prose — and keeping
+any secret in tool output away from the model), condenses each via one
+Anthropic call (raw urllib, no SDK/venv — same ethos as `dayos_client.py`),
+and writes a digest per session into a local 2ndbrain clone: one commit, no
+push until reviewed (or `--push`). Skips sessions already in the brain (each
+digest carries a `<!-- session-id: … -->` marker — self-describing, no state
+file). `--list` / `--dry-run` (+ cost estimate) write nothing.
+`tests/test_brain_backfill.py` covers it offline (faked API, synthetic JSONL,
+real temp git repo). **Same UNVERIFIED caveat as Wispr:** the JSONL schema is
+guessed, not confirmed against a real transcript (cloud sessions can't see the
+Mac), AND it only finds sessions that ran *locally* — desktop-app cloud
+sessions leave nothing on disk. `--list` on the real Mac is the first test of
+whether backfill is even possible; if it finds nothing, the answer is "his
+sessions run in the cloud" and the forward-only skill is the whole story.
+
 **Open items:**
 - [ ] **Bot-side mirror bank (step 3 above) — the next build.** Clone the
       playbook-bank pattern: git-mirror 2ndbrain into `memory/brain/`,
@@ -370,6 +389,9 @@ LEARNINGS entry.
       `cp -r .claude/skills/save-to-brain ~/.claude/skills/` from a
       2ndbrain clone — makes `/save-to-brain` available in every local
       session regardless of repo (2ndbrain README § install).
+- [ ] Founder, on the Mac: run `python3 brain_backfill.py --list` to find
+      out whether past sessions exist locally, then backfill if so. First
+      real run also validates the guessed JSONL schema.
 - [ ] Habit: end meaningful sessions with `/save-to-brain` — the skill
       only captures sessions it's invoked in.
 - [ ] Founder: check the desktop app to determine local vs. remote

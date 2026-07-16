@@ -88,7 +88,8 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
-  `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
+  `tests/test_whatsapp.py`, `tests/test_youtube.py`, and
+  `tests/test_brain_backfill.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -218,6 +219,15 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `youtube_autofetch.py` — silent daily scan of the DayOS mirror's
   `learning.md` for YouTube links → fetch+save via youtube_ingest; retry/
   park bookkeeping in the same status file; CLI (`--status`)
+- `brain_backfill.py` — standalone Mac-local utility (NOT wired into the bot
+  or VPS): one-time backfill of past Claude Code sessions into the brain.
+  Walks `~/.claude/projects/**/*.jsonl`, strips tool/thinking noise, condenses
+  each via one Anthropic call (raw urllib, no SDK), writes a digest per session
+  into a local 2ndbrain clone (one commit, no push until reviewed). Skips
+  already-backfilled sessions via a `<!-- session-id -->` marker. `--list`/
+  `--dry-run` write nothing. UNVERIFIED like Wispr: JSONL schema guessed + only
+  finds LOCALLY-executed sessions, so `--list` on the Mac is the first real
+  test. Tests: `tests/test_brain_backfill.py`.
 - `wispr_export.py` — standalone Mac-local utility (NOT wired into the bot or
   VPS): exports Wispr Flow's dictation history from its local SQLite DB to
   `~/WisprFlowExports/full-history.{json,md}`, incremental via
@@ -231,7 +241,8 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   the first real export before this is trustworthy.
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
   `tests/test_digests.py`, `tests/test_whatsapp.py`, `tests/test_youtube.py`,
-  `tests/test_wispr_export.py` — offline tests, no network (playbook sync
+  `tests/test_wispr_export.py`, `tests/test_brain_backfill.py` — offline tests,
+  no network (playbook sync
   tests clone a local file:// repo; digest tests fake the Anthropic client;
   wispr_export tests build a synthetic SQLite fixture since the real schema
   is unknown)
