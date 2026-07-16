@@ -61,6 +61,8 @@ before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
 | Agent weekly digests | the AI's own weekly synthesis | native | 🔨 Built |
 | WhatsApp chats | chosen conversations, snapshot-based | BB#2 | 🔨 Built |
 | Wispr Flow dictations | everything voice-typed | Mac export → BB#2 | 🔨 Blocked on local Mac run |
+| Claude Code conversations | insights/decisions from his LLM sessions across all projects | Mac export → BB#2 (local `~/.claude` transcripts); claude.ai data export for web sessions | 💡 Idea (entry below) |
+| YouTube — tagged videos | transcripts/summaries of videos he *chooses* to keep (send link to bot = the tag) | new link-drop pipeline (BB#2 sibling) | 💡 Idea (entry below) |
 | Google Drive notes | his Drive-synced notes | BB#1 (Drive API) | 📋 Planned (original Phase 2) |
 | Gmail | email history — agreements, bookings, receipts, threads | BB#2 (Takeout .mbox) first; BB#1 (API) only if refresh cadence demands it | 💡 Idea (entry below) |
 | Google Calendar | commitments, appointments, recurring blocks | BB#1 (ICS/API) | 💡 Idea (entry below) |
@@ -74,7 +76,7 @@ before any code is written. Pipelines: **BB#1** = synced memory-bank mirror,
 | Cadence (workouts) | training consistency vs. energy/focus | BB#1 + contract doc | 💡 Gated on product maturity |
 | Meal-Planner | nutrition | BB#1 + contract doc | 💡 Gated on product maturity |
 | Poker archive | hand histories, old poker journals | BB#2 | 💡 Legacy — only if he starts asking poker questions |
-| YouTube / watch history | consumption patterns | BB#2 (Takeout) | ⏸️ Fails the weekly-use test today |
+| YouTube / watch history (everything) | consumption patterns | BB#2 (Takeout) | ⏸️ Fails the weekly-use test — superseded by the *tagged videos* entry above |
 | Location history | Google Timeline | BB#2 (Takeout) | ⏸️ Fails the weekly-use test; privacy cost > value |
 | X/Twitter bookmarks | saved posts | BB#2 (data export) | ⏸️ Fails the weekly-use test today |
 | Photos / voice binaries | media | — | 🚫 Excluded by standing decision (pointers only) |
@@ -285,6 +287,89 @@ Priya?"). Cross-references WhatsApp/DayOS mentions.
 `remember_fact` tool (a `## People` section in profile.md) or a dedicated
 file the founder edits. Cheapest possible source; the question is curation
 habit, not code.
+
+### Claude Code conversations — 💡 Idea (added 2026-07-16)
+
+**What:** the founder's LLM session history — a lot of thinking, decisions,
+and derived insights live only inside Claude Code conversations. Goal:
+"what did we figure out about X in that session last month?" answerable
+from the brain.
+
+**Where the data actually lives (three different places):**
+1. **Local CLI sessions (his Mac):** full transcripts as JSONL under
+   `~/.claude/projects/<project-slug>/*.jsonl` — one file per session,
+   machine-readable, already on disk. **Mac-only** → same constraint as
+   Wispr Flow: needs a local Claude Code session to build/validate against
+   the real files (CLAUDE.md lesson — don't rediscover this mid-task).
+2. **Cloud/web sessions (claude.ai/code):** transcripts live on Anthropic's
+   servers. claude.ai Settings → Privacy → *Export data* emails an archive
+   of conversations; **whether Claude Code web sessions are included needs
+   a one-time verification** by the founder requesting an export and
+   looking. No API for this today.
+3. **The distilled layer (already flowing):** per the playbook's own rules,
+   session insights are supposed to land in LEARNINGS.md / docs / CLAUDE.md
+   — and those already reach the brain via the playbook bank. So the
+   *highest-value* fraction is partially captured today; this integration
+   adds the searchable raw layer underneath.
+
+**Likely approach (mirrors Wispr Flow exactly):**
+- `claude_export.py` — Mac-local, stdlib-only script: walk
+  `~/.claude/projects/**/*.jsonl`, emit one markdown file per session
+  (date, project, duration) into `~/ClaudeCodeExports/`, incremental via a
+  state file. **Filter hard:** keep user messages + the assistant's final
+  text per turn; drop tool calls/results and file dumps (raw transcripts
+  are enormous and mostly machine noise — the insight density is in the
+  prose). Optional launchd plist like Wispr's.
+- Feed via **BB#2**: upload the export to the bot; `claude_ingest.py`
+  parser module writes `memory/claude_code/<project>/<date>-<session>.md`.
+  Snapshot semantics, coverage dates, the usual.
+- Web sessions: whatever the claude.ai export verification finds — if
+  conversations.json includes them, one more parser handles that archive
+  format; if not, accept CLI-only coverage (the distilled layer still
+  catches web-session insights via docs).
+
+**Order note:** club the Mac-local run with the pending Wispr Flow local
+session — one local session can validate both exports (same pattern, same
+machine).
+
+### YouTube — tagged videos — 💡 Idea (added 2026-07-16)
+
+**What:** NOT watch history (that stays ⏸️ — fails the weekly-use test).
+This is *deliberate capture*: the founder tags a specific video and its
+transcript (or at minimum a summary) enters the brain. "What was that
+video about position sizing I saved?"
+
+**The tag = send the link to the bot.** No playlists, no YouTube account
+plumbing: he shares the YouTube URL to the Telegram bot (Share → Telegram →
+bot — two taps from the YouTube app). The bot recognizes a YouTube link,
+fetches title + transcript, shows a preview, and writes to the brain only
+after the "Add to brain" button — the exact confirm-first UX WhatsApp
+ingestion already has. A new **link-drop pipeline** beside `ingest.py`'s
+file-drop (a URL-handler sibling; reuses the confirm-first button code).
+
+**Transcript fetch, in fallback order:**
+1. `youtube-transcript-api` (no API key) or `yt-dlp --write-auto-subs
+   --skip-download` — grabs YouTube's own captions incl. auto-generated.
+   **Known risk:** YouTube increasingly blocks these fetches from
+   datacenter IPs, and the bot runs on a Hetzner VPS — this may work, work
+   intermittently, or not work; must be treated as best-effort, never
+   assumed. Failure is loud (the bot says so in the preview), not silent.
+2. **Manual fallback (his Gemini idea, generalized):** if the fetch fails,
+   the bot replies "couldn't fetch the transcript — paste a summary and
+   I'll store that instead." He hits Gemini's summarize, pastes it; the
+   entry stores link + title + summary, marked `source: manual summary`.
+   This path needs zero fragile dependencies and works from day one.
+3. Optional polish: a one-call Haiku/Sonnet TL;DR written at the top of
+   each stored transcript (~a cent, inside the daily cap) so search hits
+   read well.
+
+**Bank shape:** `memory/youtube/<video-id>.md` — title, channel, date
+saved, URL, summary, transcript. Read tools: `search_youtube` +
+`youtube_video` (or fold into cross-bank search once that exists).
+
+**Gate check:** passes — the tag action itself proves intent; nothing
+enters without him choosing it, so every stored video is by definition
+something he expected to ask about.
 
 ### Trading journal(s) — 💡 Idea
 

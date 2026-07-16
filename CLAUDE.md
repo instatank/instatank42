@@ -52,7 +52,11 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   (`deploy/DEPLOY.md` step 9).
 - **Full source map added to `docs/BACKLOG.md`** (2026-07-16): one table of
   every candidate source (live → excluded) + scoping entries for Gmail,
-  Calendar, Telegram exports, Kindle highlights, finance, people file.
+  Calendar, Telegram exports, Kindle highlights, finance, people file —
+  plus (same day, founder ask) Claude Code conversations (Mac-local export
+  like Wispr; club the two local runs) and YouTube tagged videos (send
+  link to bot = the tag; link-drop pipeline, transcript fetch best-effort
+  from a VPS, manual-summary fallback).
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
