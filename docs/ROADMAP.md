@@ -160,3 +160,23 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 - [x] Auto-sync GitHub Action added (2026-07-12, founder-approved) —
       `claude/*` pushes now merge to `main` automatically, same as
       time-tracker.
+- [x] **DayOS ⇄ 2nd-brain alignment shipped (2026-07-16)** — founder approved
+      Tier 1 + 2 + 3A (full menu + storage answer: `docs/DAYOS_ALIGNMENT.md`).
+      DayOS side (time-tracker, SW v137): weekly-review cross-device sync fixed,
+      tag tokenizers unified, Weekly-Review Open Loops, trashed-captures fix.
+      Brain side: Trends-grade `metrics.csv` (adherence / task completion /
+      leak % / skipped hrs), first-class review rendering + explicit digest
+      intention inputs, elapsed-matched week pulse.
+- [x] **Tier 3A backup chosen + built** — founder picked a private GitHub repo
+      over Drive/rclone and created `instatank/2ndbrain`; nightly
+      `memory_backup.py` mirrors the whole `memory/` tree there (also his
+      "I can't see the data" fix — browsable on GitHub or via an Obsidian vault).
+- [ ] Founder: VPS `git pull` + `setup_vps.sh` re-run installs the new
+      `memory-backup.timer`; then add `BACKUP_REPO_URL` +
+      `BACKUP_REPO_TOKEN` (Contents:read+write on `instatank/2ndbrain`) to
+      `.env`. First run is 03:30 IST, or `systemctl start
+      memory-backup.service` to test immediately (walkthrough:
+      `deploy/DEPLOY.md` § 10).
+- [ ] Founder (optional): to read the brain in Obsidian, clone
+      `instatank/2ndbrain` and point a vault at it — read-only, since the VPS
+      overwrites `memory/` every night.

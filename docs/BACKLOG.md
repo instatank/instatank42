@@ -43,6 +43,15 @@ Infrastructure that more than one integration needs. Build once, reuse.
 3. **Cross-bank search** — one tool that greps every memory bank at once.
    Trivial once 2+ banks exist; deferred until then to keep the tool list
    small (noted in `docs/SECOND_BRAIN.md`).
+4. **Nightly backup + visibility mirror** — ✅ **Built** (2026-07-16,
+   `memory_backup.py` + `memory-backup.{service,timer}`): pushes the whole
+   `memory/` tree to a private repo (`instatank/2ndbrain`) every night, so the
+   non-rebuildable banks (WhatsApp/YouTube/pasted) survive a VPS loss and the
+   founder can finally browse his brain — on GitHub, or an Obsidian vault
+   pointed at a clone. Mirrors into the repo's `memory/` subfolder (coexists
+   with its `sessions/` digest lane); skips nested git-mirror checkouts;
+   commits only on change; Telegram-alerts on failure; token from `.env`,
+   never written to disk. Full rationale + tier menu: `docs/DAYOS_ALIGNMENT.md`.
 
 ## The full source map (2026-07-16)
 

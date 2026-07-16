@@ -152,11 +152,11 @@ def test_digest_build():
     assert "Deep Work 2.0" in week
     assert "DFT done: 1/1" in week
     assert "Wins (#win): 2" in week                    # capture + journal both tagged
-    assert "A strong, focused week." in week
-    assert "intention: Focus on DayOS" in week
+    assert "A strong, focused week." in week            # aiSummary rendered as prose
+    assert "Intention for next week: Focus on DayOS" in week  # structured review render
 
     month = files[f"months/{MONTH}.md"]
-    assert "oneFocus: Deep work volume" in month
+    assert "One focus: Deep work volume" in month
 
     proj = files["projects/dayos.md"]
     assert "Plan the sync module" in proj
@@ -209,15 +209,27 @@ def test_lenses_build():
     never_aug = dayos_digest.build_all(fixture_raw(), today="2026-08-01")["never-closed.md"]
     assert "digests" in never_aug
 
-    # metrics.csv: header + exact per-day rows (hours, rating, metrics, dft, wins)
+    # metrics.csv: header + exact per-day rows — hours, rating, check-in
+    # metrics, dft, wins, then the Trends-grade derived columns (adherence %,
+    # task completion, leak %, skipped waking hrs) DayOS shows but never persists
     metrics = files["metrics.csv"]
     lines = metrics.splitlines()
     assert lines[0] == ("date,deep_work_h,learning_h,practice_h,routine_h,"
                         "leisure_h,leaks_h,total_h,rating,habit_stacking,"
-                        "mindset,dft_status,wins")
-    assert "2026-07-01,2.00,0.00,0.00,1.00,0.00,0.00,3.00,4,4,3,done,2" in lines
-    assert "2026-07-02,0.00,1.00,0.00,0.00,0.00,0.00,1.00,,,,,0" in lines
+                        "mindset,dft_status,wins,adherence_pct,task_done,"
+                        "task_total,leak_pct,skipped_h")
+    # D1: deep_work 120min meets the ≥120m rule (1 of 3 auto-rules -> 33%);
+    # 1 of 3 journal tasks done; 0 leaks; 16h-3h logged = 13h skipped (past day)
+    assert ("2026-07-01,2.00,0.00,0.00,1.00,0.00,0.00,3.00,4,4,3,done,2,"
+            "33,1,3,0,13.00") in lines
+    # D2: learning 60min meets the ≥60m rule -> 33%; 1 of 2 tasks; 16h-1h = 15h
+    assert ("2026-07-02,0.00,1.00,0.00,0.00,0.00,0.00,1.00,,,,,0,"
+            "33,1,2,0,15.00") in lines
     assert lines[1].startswith(D0)                     # rows ascending
+    # skipped_h is blank for the current in-progress day (not yet "skipped")
+    d2_today = dayos_digest.build_all(fixture_raw(), today=D2)["metrics.csv"]
+    d2row = next(r for r in d2_today.splitlines() if r.startswith(D2)).split(",")
+    assert d2row[-1] == "" and d2row[-2] == "0"        # skipped blank, leak_pct 0
     print("ok lenses build")
 
 
@@ -267,7 +279,8 @@ def test_views_store():
     # Phase B pulses: week numbers from metrics.csv at a pinned "now"...
     pulse = dayos_store._week_pulse(now=memory.datetime(2026, 7, 2))
     assert "this week so far 4.0h" in pulse
-    assert "Deep Work 2.0" in pulse and "vs last week 0.0h" in pulse
+    assert "Deep Work 2.0" in pulse
+    assert "vs 0.0h over the same days last week" in pulse
     # ...and the loops line straight off the view files (real clock: all aged out)
     lp = dayos_store._loops_pulse()
     assert lp.startswith("Open loops: none active") and "3 never-closed" in lp
@@ -387,6 +400,40 @@ def test_sync_status_written_on_error():
     print("ok sync error status")
 
 
+def test_elapsed_week_pulse():
+    # Elapsed-matched comparison (mirrors DayOS prevDashPeriodRange): a Sun–Mon
+    # pulse must compare vs last week's Sun–Mon only, NOT last week's full total
+    # (which had a big Saturday), else every early-week pulse reads as a drop.
+    d = dayos_store.DAYOS_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "metrics.csv").write_text(
+        "date,deep_work_h,total_h\n"
+        "2026-06-21,1.00,1.00\n"   # last week Sunday   -> matched
+        "2026-06-27,9.00,9.00\n"   # last week Saturday -> NOT matched
+        "2026-06-28,2.00,2.00\n"   # this week Sunday
+        "2026-06-29,2.00,2.00\n",  # this week Monday == now
+        encoding="utf-8")
+    pulse = dayos_store._week_pulse(now=memory.datetime(2026, 6, 29))
+    assert "this week so far 4.0h" in pulse
+    assert "vs 1.0h over the same days last week" in pulse
+    print("ok elapsed week pulse")
+
+
+def test_review_inputs():
+    # Raw-review readers that feed the digest syntheses explicitly, so a prior
+    # period's stated intention can't be truncated out of a size-capped rollup.
+    dayos_store.RAW_DIR.mkdir(parents=True, exist_ok=True)
+    (dayos_store.RAW_DIR / "weeklyReviews.json").write_text(json.dumps({
+        WEEK: {"weekStart": WEEK, "nextWeekIntention": "Ship the digest"}}),
+        encoding="utf-8")
+    (dayos_store.RAW_DIR / "monthlyReviews.json").write_text(json.dumps({
+        MONTH: {"month": MONTH, "oneFocus": "Deep work volume"}}), encoding="utf-8")
+    assert dayos_store.review_intention(WEEK) == "Ship the digest"
+    assert dayos_store.review_intention("2020-01-05") == ""      # missing -> empty
+    assert dayos_store.month_focus(MONTH) == "Deep work volume"
+    print("ok review inputs")
+
+
 if __name__ == "__main__":
     try:
         test_decode()
@@ -400,6 +447,8 @@ if __name__ == "__main__":
         test_staleness()
         test_bot_wiring()
         test_sync_status_written_on_error()
+        test_elapsed_week_pulse()
+        test_review_inputs()
         print("ALL DAYOS TESTS PASSED")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

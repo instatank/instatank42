@@ -80,6 +80,43 @@ def _read(path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+# --- Raw review readers (for the digest syntheses) ---------------------------
+
+def _load_raw(name: str) -> dict:
+    """One mirrored raw collection ({doc_id: fields}) from memory/dayos/raw —
+    for the rare case a digest needs a field the markdown rollup doesn't
+    surface verbatim (e.g. a prior period's stated intention)."""
+    p = RAW_DIR / f"{name}.json"
+    if p.exists():
+        try:
+            return json.loads(_read(p))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def weekly_review(week_start: str) -> dict:
+    return _load_raw("weeklyReviews").get(week_start) or {}
+
+
+def monthly_review(ym: str) -> dict:
+    return _load_raw("monthlyReviews").get(ym) or {}
+
+
+def review_intention(week_start: str) -> str:
+    """The 'intention for next week' the founder set in a past weekly review —
+    lets a later week's digest call out whether it actually happened."""
+    r = weekly_review(week_start)
+    return str(r.get("nextWeekIntention") or r.get("intention") or "").strip()
+
+
+def month_focus(ym: str) -> str:
+    """The 'one focus' the founder set for a month — for the next month's
+    synthesis to judge against."""
+    r = monthly_review(ym)
+    return str(r.get("oneFocus") or "").strip()
+
+
 # --- Day / period / project lookups ------------------------------------------
 
 def _resolve_date(date_str: str) -> str:
@@ -328,6 +365,13 @@ def _week_pulse(now=None) -> str:
     now = now or memory.now()
     this_ws = _week_start_of(now)
     last_ws = _week_start_of(now - timedelta(days=7))
+    # Elapsed-matched comparison: measure last week only up to the SAME weekday
+    # we've reached this week, so a Tuesday pulse compares Sun–Tue vs Sun–Tue,
+    # not Sun–Tue vs a full Sun–Sat (which always read as a drop). Mirrors
+    # DayOS's own prevDashPeriodRange — week-to-date vs same-days-last-week.
+    elapsed = (now.date() - memory.datetime.fromisoformat(this_ws).date()).days
+    matched_last_end = (memory.datetime.fromisoformat(last_ws)
+                        + timedelta(days=elapsed)).strftime("%Y-%m-%d")
     this_total = last_total = 0.0
     per_cat: dict = {}
     for row in lines[1:]:
@@ -343,7 +387,7 @@ def _week_pulse(now=None) -> str:
                     per_cat[cid] = per_cat.get(cid, 0.0) + float(vals[i] or 0)
                 except (ValueError, IndexError):
                     pass
-        elif d >= last_ws:
+        elif last_ws <= d <= matched_last_end:
             last_total += total
     if this_total == 0 and last_total == 0:
         return ""
@@ -351,7 +395,7 @@ def _week_pulse(now=None) -> str:
     cats = " · ".join(f"{dayos_digest.CATS.get(c, c)} {v:.1f}" for v, c in top)
     return (f"Pulse: this week so far {this_total:.1f}h"
             + (f" ({cats})" if cats else "")
-            + f" vs last week {last_total:.1f}h.")
+            + f" vs {last_total:.1f}h over the same days last week.")
 
 
 def _loops_pulse() -> str:

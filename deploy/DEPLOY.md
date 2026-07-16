@@ -396,6 +396,61 @@ same as the others.)
 - If a scheduled run fails, the agent messages you the error itself (and
   skips politely if the day's budget cap is already spent).
 
+## 10b. Back up your brain + finally see your data — optional, 5 minutes
+
+Everything the agent remembers lives as plain files on this server. Some of it
+(the DayOS mirror, the playbook) can always be rebuilt — but the **WhatsApp
+exports, YouTube transcripts, and anything you pasted in** exist *only* here. If
+this server ever dies, they're gone. This step copies your whole brain to a
+**private GitHub repo every night** — which also means you can finally **open
+the repo and read your brain's files** (on GitHub, or by cloning it into an
+Obsidian vault).
+
+**One-time setup:**
+
+1. Create a **private** repo on GitHub called `2ndbrain` (Settings will already
+   have one if a Claude Code session set it up for you — reuse it).
+2. Make a **fine-grained token** with **Contents: Read and write** on *only*
+   that repo: GitHub → Settings → Developer settings → Fine-grained tokens.
+3. Open the settings file:
+
+```
+nano /opt/instatank-agent/.env
+```
+
+Fill in (these lines are already there if you copied the newer `.env.example`):
+
+```
+BACKUP_REPO_URL=https://github.com/instatank/2ndbrain.git
+BACKUP_REPO_TOKEN=paste-your-fine-grained-token-here
+```
+
+4. Save (Ctrl+O, Enter, Ctrl+X). Install the nightly timer and run the first
+   backup now to check it works:
+
+```
+cd /opt/instatank-agent && git pull && bash deploy/setup_vps.sh https://github.com/instatank/instatank42.git
+systemctl start memory-backup.service
+```
+
+Then open your `2ndbrain` repo on GitHub — you should see a new `memory/`
+folder with everything in it. After that it backs itself up every night at
+3:30am IST, only committing when something actually changed.
+
+**Notes:**
+- It runs **as a manual command with `sudo` won't work** for the same reason as
+  the others — always go through `systemctl start memory-backup.service` so it
+  loads `.env`. Check what happened with
+  `journalctl -u memory-backup.service --no-pager -n 20`.
+- The token is scrubbed from every log and never written into the repo on disk.
+- Your brain has **no secrets in it** — passwords and keys live in `.env` and
+  the Firebase key file, which sit *outside* the backed-up folder.
+- **Reading it in Obsidian:** clone the repo (`git clone …/2ndbrain.git`) and
+  open the folder as a vault. Treat it as **read-only** — the server rewrites
+  `memory/` every night, so anything you *write* belongs in DayOS or a separate
+  vault folder, not inside the mirrored `memory/`.
+- If a nightly backup ever fails, the agent messages you the reason on Telegram.
+
 ## 11. Troubleshooting
 
 **The service won't start / status shows "failed":**

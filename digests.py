@@ -215,6 +215,13 @@ def build_input(week_start: str) -> str:
     prev = week_start_of(ws - timedelta(days=7))
     parts.append("## Last week's rollup (for deltas)\n" +
                  (_read_if_exists(dayos_store.DAYOS_DIR / "weeks" / f"{prev}.md", 1500) or "(none)"))
+    # The prior week's stated intention, pulled explicitly from the raw review
+    # so it can never be truncated away inside the size-capped rollup above —
+    # this is what lets the synthesis say whether last week's plan happened.
+    prev_intention = dayos_store.review_intention(prev)
+    if prev_intention:
+        parts.append("## Last week's stated intention\n" + prev_intention +
+                     "\n(Say plainly whether this week's data shows it happened.)")
     parts.append("## Your previous synthesis\n" +
                  (_read_if_exists(path_for(prev), 1500) or "(none — this is the first)"))
 
@@ -313,6 +320,10 @@ def build_month_input(ym: str) -> str:
     parts.append("## Last month's DayOS rollup (for deltas)\n" +
                  (_read_if_exists(dayos_store.DAYOS_DIR / "months" / f"{prev_ym}.md", 1500)
                   or "(none)"))
+    prev_focus = dayos_store.month_focus(prev_ym)
+    if prev_focus:
+        parts.append("## Last month's stated focus\n" + prev_focus +
+                     "\n(Say whether it was honored.)")
     parts.append("## Your previous monthly synthesis\n" +
                  (_read_if_exists(month_path(prev_ym), 1500) or "(none — this is the first)"))
     parts.append("## Your current themes file\n" +

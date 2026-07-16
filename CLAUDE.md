@@ -111,9 +111,25 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   `weekly_digest` → **`digest`** (weeks + months + 'themes'). Everything
   live after VPS `git pull` + `setup_vps.sh` re-run (installs the
   monthly timer) + `/sync`.
+- **DayOS ⇄ 2nd-brain alignment shipped (2026-07-16, founder approved Tier
+  1+2+3A)** — plan of record `docs/DAYOS_ALIGNMENT.md` (also answers "where does
+  the data live"). DayOS side (time-tracker, SW v137): weekly-review
+  cross-device sync bug fixed, tag tokenizers unified, Weekly-Review Open Loops,
+  trashed-captures fix. Brain side: `metrics.csv` gained Trends-grade columns
+  (`adherence_pct`, `task_done`/`task_total`, `leak_pct`, `skipped_h` — the
+  adherence engine is replicated from DayOS on the mirrored blocks, `meta/
+  adherence` now consumed); weekly/monthly reviews render as structured sections
+  (`_render_review`) and feed the digests their prior-period intention/focus
+  explicitly; the week pulse is elapsed-matched (same days last week). **Backup
+  (3A): `memory_backup.py` + `memory-backup.{service,timer}`** push the whole
+  `memory/` tree nightly (03:30 IST) to the private `instatank/2ndbrain` repo's
+  `memory/` subfolder — protects the non-rebuildable banks and lets the founder
+  browse the brain (GitHub / Obsidian vault on a clone). Live after VPS `git
+  pull` + `setup_vps.sh` re-run + adding `BACKUP_REPO_URL`/`BACKUP_REPO_TOKEN`
+  to `.env`.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
-  `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
+  `tests/test_whatsapp.py`, `tests/test_youtube.py`, and `tests/test_backup.py`).
 - **Branch flow:** `main` exists (created 2026-07-12, founder-approved, by
   merging all prior `claude/*` branches — which never auto-merged and once
   left a session planning against a 9-day-stale view). `main` is the source
@@ -255,6 +271,13 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `youtube_autofetch.py` — silent daily scan of the DayOS mirror's
   `learning.md` for YouTube links → fetch+save via youtube_ingest; retry/
   park bookkeeping in the same status file; CLI (`--status`)
+- `memory_backup.py` — nightly backup + visibility mirror: git-pushes the whole
+  `memory/` tree to the private `instatank/2ndbrain` repo's `memory/` subfolder
+  (skips nested git-mirror checkouts; commits only on change; Telegram-alerts on
+  failure; token from `.env`, never on disk). Config `BACKUP_REPO_URL` (+
+  `BACKUP_REPO_TOKEN`/`BACKUP_REPO_BRANCH`); working clone lives in
+  `.brain-backup/` OUTSIDE memory/. CLI (`--status`). Rationale:
+  `docs/DAYOS_ALIGNMENT.md`
 - `wispr_export.py` — standalone Mac-local utility (NOT wired into the bot or
   VPS): exports Wispr Flow's dictation history from its local SQLite DB to
   `~/WisprFlowExports/full-history.{json,md}`, incremental via
@@ -268,10 +291,10 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   the first real export before this is trustworthy.
 - `tests/test_smoke.py`, `tests/test_dayos.py`, `tests/test_playbook.py`,
   `tests/test_digests.py`, `tests/test_whatsapp.py`, `tests/test_youtube.py`,
-  `tests/test_wispr_export.py` — offline tests, no network (playbook sync
-  tests clone a local file:// repo; digest tests fake the Anthropic client;
-  wispr_export tests build a synthetic SQLite fixture since the real schema
-  is unknown)
+  `tests/test_wispr_export.py`, `tests/test_backup.py` — offline tests, no
+  network (playbook sync + backup tests clone/push a local file:// repo; digest
+  tests fake the Anthropic client; wispr_export tests build a synthetic SQLite
+  fixture since the real schema is unknown)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
 - `docs/DAYOS_ORGANIZATION.md` — the plan for organizing DayOS entries in
   the brain (tag views, open-loops ledger, metrics table, monthly

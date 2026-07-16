@@ -1,0 +1,19 @@
+[Unit]
+Description=Nightly backup of the agent's memory/ to the private brain repo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=agent
+WorkingDirectory=/opt/instatank-agent
+EnvironmentFile=/opt/instatank-agent/.env
+ExecStart=/opt/instatank-agent/venv/bin/python memory_backup.py
+
+# Hardening: reads memory/ (read access is enough — it only COPIES from it) and
+# writes ONLY its own working clone under .brain-backup (never memory/ itself).
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/instatank-agent/.brain-backup
+ProtectHome=yes
+PrivateTmp=yes

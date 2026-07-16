@@ -2,10 +2,27 @@
 venv/
 __pycache__/
 *.pyc
-# personal memory stays on the server, not in git
+# personal memory stays on the server, not in git.
+# Everything under memory/ is private data or a rebuildable mirror — keep the
+# whole tree out of git EXCEPT the committed profile stub (whitelisted below).
+# (Backups live in the private instatank/2ndbrain repo, pushed nightly from the
+# VPS by memory_backup.py — NOT via this repo.)
+memory/*
+!memory/profile.md
+# Explicit per-bank lines kept for clarity even though memory/* covers them:
 memory/sessions/
 memory/usage/
 memory/dayos/
+memory/playbook/
+memory/whatsapp/
+memory/youtube/
+memory/digests/
+memory/drive/
+memory/gmail/
+memory/calendar/
+# working clone for the nightly memory backup (memory_backup.py) — lives
+# outside memory/ so it never backs up itself; never committed here
+.brain-backup/
 # Firebase service-account key (secret) — lives only on the server
 *.firebase-sa.json
 .firebase-sa.json

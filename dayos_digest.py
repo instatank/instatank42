@@ -46,6 +46,22 @@ CATS = {
     "leaks": "Leaks",
 }
 SLEEP_ID = "sleep"  # legacy blocks only; excluded from waking-hour totals
+WAKING_DAY_MIN = 16 * 60  # a fully-elapsed day = 16 waking hours (matches
+                          # WAKING_TOTAL_MIN in time-tracker/index.html); used
+                          # to derive "skipped" (unlogged waking) hours.
+
+# Adherence engine defaults — mirror DEFAULT_ADHERENCE_RULES in
+# time-tracker/index.html. Used only when the founder hasn't customized
+# meta/adherence. Categories are stored as CAT ids here; the app stores labels
+# and maps them, so _adherence_cat_id accepts either.
+DEFAULT_ADHERENCE_RULES = [
+    {"id": "deepwork", "type": "auto", "source": "timeBlocks",
+     "condition": {"category": "deep_work", "minMinutes": 120}},
+    {"id": "practice", "type": "auto", "source": "timeBlocks",
+     "condition": {"category": "practice", "minMinutes": 1}},
+    {"id": "learning", "type": "auto", "source": "timeBlocks",
+     "condition": {"category": "learning", "minMinutes": 60}},
+]
 CTYPES = {
     "note": "Quick Note",
     "daily": "Daily Journal",
@@ -209,6 +225,102 @@ def _review_lines(review: dict) -> list:
             continue
         out.append(f"- {k}: {_fmt_review_value(v)}")
     return out
+
+
+def _pct01(v) -> str:
+    """A 0..1 rate as a percent; passes non-numeric values through."""
+    return f"{round(float(v) * 100)}%" if isinstance(v, (int, float)) else str(v)
+
+
+# Fields _render_review handles explicitly (so the generic tail doesn't repeat
+# them). Everything else in a review doc still renders — drift degrades nicely.
+_REVIEW_KNOWN = {
+    "_synced", "deletedAt", "aiSummary", "savedAt",
+    "weekStart", "weekEnd", "month", "monthLabel",
+    "intention", "nextWeekIntention", "totals", "starAverages", "patterns",
+    "tasks", "directionCheck", "projectActions", "newProjects",
+    "learningHarvest", "learningFocusNext", "weeklyIntentionsCoherence",
+    "oneFocus", "oneExperiment",
+}
+
+
+def _render_review(review: dict, kind: str) -> list:
+    """Structured render of a Weekly/Monthly Review — the fields the founder
+    actually fills, friendly-labelled and highest-signal first, then a generic
+    dump of anything unrecognized (schema-drift safe). aiSummary is rendered by
+    the caller as prose. Replaces the old flat key:value dump so both the
+    rollup files and the AI syntheses that read them get legible review data."""
+    L = []
+    intention = review.get("nextWeekIntention") or review.get("intention")
+    if intention:
+        label = "Intention for next week" if kind == "week" else "Focus for next month"
+        L.append(f"- {label}: {str(intention).strip()}")
+    if review.get("oneFocus"):
+        L.append(f"- One focus: {str(review['oneFocus']).strip()}")
+    if review.get("oneExperiment"):
+        L.append(f"- One experiment: {str(review['oneExperiment']).strip()}")
+    totals = review.get("totals")
+    if isinstance(totals, dict):
+        bits = []
+        if totals.get("deepWorkHrs") is not None:
+            bits.append(f"deep work {totals['deepWorkHrs']}h")
+        if totals.get("adherencePct") is not None:
+            bits.append(f"adherence {totals['adherencePct']}%")
+        if totals.get("dftRate") is not None:
+            bits.append(f"DFT {_pct01(totals['dftRate'])}")
+        if totals.get("taskCompletionRate") is not None:
+            bits.append(f"tasks {_pct01(totals['taskCompletionRate'])}")
+        if totals.get("winCount") is not None:
+            bits.append(f"wins {totals['winCount']}")
+        if totals.get("dayRatingAvg") is not None:
+            bits.append(f"avg rating {totals['dayRatingAvg']}/5")
+        if bits:
+            L.append("- Snapshot at save: " + ", ".join(bits))
+    patterns = review.get("patterns")
+    if isinstance(patterns, list) and patterns:
+        L.append("- Patterns DayOS surfaced:")
+        L.extend(f"  - {str(p).strip()}" for p in patterns if str(p).strip())
+    dc = review.get("directionCheck")
+    if isinstance(dc, dict):
+        if dc.get("gotClearer"):
+            L.append(f"- Got clearer on: {str(dc['gotClearer']).strip()}")
+        if dc.get("didntGoAsPlanned"):
+            L.append(f"- Didn't go as planned: {str(dc['didntGoAsPlanned']).strip()}")
+    pa = review.get("projectActions")
+    if isinstance(pa, list):
+        calls = [f"{a['projectName']}→{a['action']}" for a in pa
+                 if isinstance(a, dict) and a.get("projectName") and a.get("action")]
+        if calls:
+            L.append("- Project portfolio calls: " + ", ".join(calls))
+    lh = review.get("learningHarvest")
+    if isinstance(lh, dict):
+        if lh.get("worthApplying"):
+            L.append(f"- Worth applying: {str(lh['worthApplying']).strip()}")
+        if lh.get("topTags"):
+            L.append(f"- Top learning tags: {_fmt_review_value(lh['topTags'])}")
+    lfn = review.get("learningFocusNext")
+    if isinstance(lfn, dict) and (lfn.get("freeText") or lfn.get("tags")):
+        parts = []
+        if lfn.get("tags"):
+            parts.append(_fmt_review_value(lfn["tags"]))
+        if lfn.get("freeText"):
+            parts.append(str(lfn["freeText"]).strip())
+        L.append("- Learning focus next: " + " — ".join(p for p in parts if p))
+    coh = review.get("weeklyIntentionsCoherence")
+    if coh:
+        L.append(f"- Weekly intentions were: {coh}")
+    tasks = review.get("tasks")
+    if isinstance(tasks, list) and tasks:
+        done = sum(1 for t in tasks if isinstance(t, dict) and t.get("completed"))
+        L.append(f"- Review to-dos: {done}/{len(tasks)} done")
+    for k in sorted(review):
+        if k in _REVIEW_KNOWN or k.startswith("_"):
+            continue
+        v = review[k]
+        if v in (None, "", [], {}):
+            continue
+        L.append(f"- {k}: {_fmt_review_value(v)}")
+    return L
 
 
 # --- Per-day digest --------------------------------------------------------
@@ -390,7 +502,7 @@ def render_week(ws: str, by_date: dict, review) -> str:
     if day_bits:
         L.append("Daily: " + " · ".join(day_bits))
     if review:
-        lines = _review_lines(review)
+        lines = _render_review(review, "week")
         if lines:
             L.append("")
             L.append("## Weekly review")
@@ -416,7 +528,7 @@ def render_month(ym: str, dates: list, by_date: dict, review) -> str:
     if wk_bits:
         L.append("By week: " + " · ".join(wk_bits))
     if review:
-        lines = _review_lines(review)
+        lines = _render_review(review, "month")
         if lines:
             L.append("")
             L.append("## Monthly review")
@@ -670,15 +782,76 @@ def render_open_loops(raw: dict, bd: dict, today: str) -> tuple[str, str]:
     return active_md, never_md
 
 
-def render_metrics(bd: dict, metric_ids: list) -> str:
-    """metrics.csv — one row per day with entries: hours by category, total,
-    day rating, each check-in metric, DFT status, wins. The machine-readable
-    spine for trend/correlation questions; dates ascending."""
+def _adherence_cat_id(cat) -> str:
+    """Map a rule's condition.category (a CAT id like 'deep_work' OR a label
+    like 'Deep Work') to the canonical category id — the app stores labels."""
+    if not cat:
+        return ""
+    if cat in CATS:
+        return cat
+    for cid, label in CATS.items():
+        if cat == label:
+            return cid
+    return str(cat)
+
+
+def _adherence_rules(raw: dict) -> list:
+    """(cat_id, min_minutes) for every enabled auto/timeBlocks rule in
+    meta/adherence — the founder's own config, else DayOS's built-in defaults.
+    Explicit rules are skipped: they read a per-day dailyChecks doc DayOS
+    doesn't sync, so they can't be evaluated here (the app treats an absent
+    check as 'not met' too, so we match it by omission)."""
+    meta = raw.get("meta", {}) or {}
+    cfg = meta.get("adherence") or {}
+    rules = cfg.get("rules")
+    if not isinstance(rules, list) or not rules:
+        rules = DEFAULT_ADHERENCE_RULES
+    out = []
+    for r in rules:
+        if not isinstance(r, dict) or r.get("enabled") is False:
+            continue
+        if r.get("type") != "auto" or r.get("source") != "timeBlocks":
+            continue
+        cond = r.get("condition") or {}
+        try:
+            min_min = float(cond.get("minMinutes") or 0)
+        except (TypeError, ValueError):
+            min_min = 0.0
+        out.append((_adherence_cat_id(cond.get("category")), min_min))
+    return out
+
+
+def _day_adherence_pct(day_blocks: list, rules: list):
+    """Percent of enabled auto-rules met this day (same math as the app's
+    calculateAdherence, one day wide), or None when no rules are configured."""
+    if not rules:
+        return None
+    passed = 0
+    for cat_id, min_min in rules:
+        mins = sum(_block_minutes(b) for b in day_blocks if b.get("category") == cat_id)
+        if mins >= min_min:
+            passed += 1
+    return round(passed / len(rules) * 100)
+
+
+def render_metrics(bd: dict, metric_ids: list, rules: list, today: str) -> str:
+    """metrics.csv — one row per day: hours by category, total, day rating,
+    each check-in metric, DFT status, wins, and the Trends-grade derived
+    numbers the DayOS dashboard shows but never persists — adherence %, task
+    completion, leak %, and skipped (unlogged waking) hours. The machine-
+    readable spine for trend/correlation questions; dates ascending.
+
+    Derived columns are appended after `wins` so existing readers (and column
+    positions) are undisturbed. `skipped_h` is left blank for `today` and any
+    future date, since a day still in progress hasn't 'skipped' its unlogged
+    hours yet — it's only meaningful once the day is complete."""
     cols = (["date"] + [f"{c}_h" for c in CATS] + ["total_h", "rating"]
-            + list(metric_ids) + ["dft_status", "wins"])
+            + list(metric_ids) + ["dft_status", "wins",
+            "adherence_pct", "task_done", "task_total", "leak_pct", "skipped_h"])
     rows = [",".join(cols)]
     for d in sorted(bd["all_dates"]):
-        total, per = _cat_totals(bd["blocks"].get(d, []))
+        day_blocks = bd["blocks"].get(d, [])
+        total, per = _cat_totals(day_blocks)
         row = [d]
         row += [f"{per.get(c, 0) / 60:.2f}" for c in CATS]
         row.append(f"{total / 60:.2f}")
@@ -693,6 +866,23 @@ def render_metrics(bd: dict, metric_ids: list) -> str:
         wins = sum(1 for doc in (bd["captures"].get(d, []) + bd["journals_list"].get(d, []))
                    if "#win" in (doc.get("tags") or []))
         row.append(str(wins))
+        # --- Trends-grade derived columns ---
+        adh = _day_adherence_pct(day_blocks, rules)
+        row.append(str(adh) if adh is not None else "")
+        journal = bd["journals"].get(d) or {}
+        tasks = [t for t in (journal.get("tasks") or []) if isinstance(t, dict) and (t.get("text") or "").strip()]
+        if tasks:
+            done = sum(1 for t in tasks if t.get("completed"))
+            row.append(str(done))
+            row.append(str(len(tasks)))
+        else:
+            row += ["", ""]
+        leaks_min = per.get("leaks", 0)
+        row.append(f"{leaks_min / total * 100:.0f}" if total > 0 else "")
+        if today and d < today:
+            row.append(f"{max(0.0, WAKING_DAY_MIN - total) / 60:.2f}")
+        else:
+            row.append("")
         rows.append(",".join(row))
     return "\n".join(rows) + "\n"
 
@@ -830,7 +1020,8 @@ def build_all(raw: dict, today: str = "") -> dict:
         files[f"tags/{fname}.md"] = render_tag_view(" / ".join(tags_), entries)
 
     files["open-loops.md"], files["never-closed.md"] = render_open_loops(raw, bd, today)
-    files["metrics.csv"] = render_metrics(bd, _metrics_columns(metric_labels, bd))
+    files["metrics.csv"] = render_metrics(
+        bd, _metrics_columns(metric_labels, bd), _adherence_rules(raw), today)
 
     files["index.md"] = _render_index(raw, bd, names)
     return files
