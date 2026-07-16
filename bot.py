@@ -176,20 +176,23 @@ DAYOS_TOOLS = [
         "name": "dayos_view",
         "description": (
             "Read one of the DayOS bank's cross-cutting views. 'open loops': "
-            "everything he said he'd do that is still pending (unchecked journal "
-            "tasks, pending session items, today's focus task), grouped by age "
-            "with the oldest first — use for 'what's still pending / what am I "
-            "dropping'. 'metrics': a CSV with one row per day (hours by category, "
-            "total, day rating, check-in metrics, focus-task status, wins) — use "
-            "for trends and correlations across many days. A '#tag' (e.g. '#win', "
-            "'#insight'): every entry carrying that tag in full, newest first — "
-            "use for 'show me all my wins/insights'. 'list' shows all views."
+            "still-pending items from the last 10 days (unchecked journal tasks "
+            "deduped across carried-forward days, pending session items, today's "
+            "focus task), oldest first — use for 'what's still pending'. 'never "
+            "closed': loops that stayed open past 10 days, kept forever — use for "
+            "'what do I keep dropping'. 'metrics': a CSV with one row per day "
+            "(hours by category, total, day rating, check-in metrics, focus-task "
+            "status, wins) — use for trends and correlations across many days. "
+            "A '#tag' (e.g. '#win', '#insight'): every entry carrying that tag "
+            "in full, newest first — use for 'show me all my wins/insights'. "
+            "'list' shows all views."
         ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "name": {"type": "string",
-                         "description": "'open loops', 'metrics', a '#tag', or 'list'."}
+                         "description": ("'open loops', 'never closed', 'metrics', "
+                                         "a '#tag', or 'list'.")}
             },
             "required": ["name"],
         },

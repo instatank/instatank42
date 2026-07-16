@@ -5,8 +5,10 @@ second brain into an intelligent system that maximizes insight for minimal
 effort. This is the plan of record for how the DayOS bank gets smarter.
 `SECOND_BRAIN.md` stays the architecture for memory banks in general; this
 doc is specifically about what shapes the DayOS data takes and why. Status:
-**Phase A built + offline-tested 2026-07-16** (live after VPS `git pull` +
-restart + `/sync`); Phases B and C await founder review of this doc.*
+**Phase A LIVE (founder-verified 2026-07-16); open-loops v2 + Phase B built
++ offline-tested same day** (live after the next VPS `git pull` + restart +
+`/sync`); **Phase C approved by the founder's answers below** (monthly on
+the 5th + themes, no quarterly) — awaiting build.*
 
 ## The idea in one paragraph
 
@@ -31,7 +33,7 @@ data he already produces.
 | 0 · Raw | `raw/*.json` — exact Firestore copy | $0 | ✅ exists |
 | 1 · Lenses | mechanical views: by time ✅, by project ✅, **by tag, open loops, numbers table** | $0 (pure code in the existing sync) | **Phase A — ✅ built 2026-07-16** |
 | 2 · Distillation | the AI's opinion lane in `memory/digests/`: weekly ✅, **monthly + standing themes** | ~$0.02 per call | rest = **Phase C** |
-| 3 · Ambient | what rides in every prompt: today+yesterday ✅, **week pulse + open loops** | ~100 tokens/msg | **Phase B** |
+| 3 · Ambient | what rides in every prompt: today+yesterday ✅, **week pulse + open loops** | ~100 tokens/msg | **Phase B — ✅ built 2026-07-16** |
 
 Standing rules across all layers (unchanged from `SECOND_BRAIN.md`): every
 Layer-1 file is a pure function of raw — delete it and the next sync
@@ -61,20 +63,31 @@ snippet — newest first, each line dated and labeled by origin (journal /
 capture / session / learning / block). Turns "all my insights from June"
 into one read that arrives as a document, not a pile of fragments.
 
-**A2. Open-loops ledger — `open-loops.md`.** Everything he said he'd do
-that isn't done, in one file, grouped by age (this week / last 30 days /
-older): unchecked Daily-Journal tasks, `pending[]` items from each
-project's *latest* session, today's DFT if still pending (older pending
-DFTs auto-skip in the app, so they're history, not loops). Every line
-carries the date it was written; the oldest stares back first. Items
-vanish automatically at rebuild once done in the app. Probably the highest
-insight-per-effort file in the whole plan — it's the "what am I dropping?"
-view, and it becomes a better input to the weekly synthesis than the
+**A2. Open-loops ledger — `open-loops.md` + `never-closed.md`** *(v2 —
+founder decisions after live testing, 2026-07-16)*. Everything he said
+he'd do that isn't done: unchecked Daily-Journal tasks, `pending[]` items
+from each project's *latest* session, today's DFT if still pending (older
+pending DFTs auto-skip in the app — history, not loops). Two founder
+rules shape the file:
+
+- **Carried-forward copies collapse into one line.** DayOS journals repeat
+  an unfinished task day after day; the ledger shows the task once, dated
+  from the day it first went open — so its age means "open this long", not
+  "mentioned this often". Ticking any day's copy closes the loop
+  everywhere; a task re-added after being completed starts a fresh loop.
+- **Ten days of nagging, then the archive.** `open-loops.md` holds only
+  loops from the last 10 days — the actionable list, oldest first.
+  Anything older moves to `never-closed.md`, kept for perpetuity: what
+  tends to land there is a signal in itself, and it has its own view
+  (`dayos_view("never closed")`).
+
+Items vanish automatically at rebuild once done in the app. Probably the
+highest insight-per-effort file in the whole plan — it's the "what am I
+dropping?" view, and a better input to the weekly synthesis than the
 per-day scraps it reads today.
 
-*Honest caveat:* a journal task he did but never ticked stays "open" —
-the data can't know. The age buckets make that tolerable: an old open item
-deserves a look either way (do it or delete it).
+*Honest caveat:* a task he did but never ticked stays listed (eventually
+in never-closed) — the data can't know. Do it or delete it in the app.
 
 **A3. The numbers table — `metrics.csv`.** One row per day: hours by
 category, total logged, day rating, each check-in metric, DFT status, wins
@@ -95,9 +108,9 @@ notes:**
   `projects/<slug>.md` already gives those a richer, typed view.
 - The four special tags' views exist even when empty, so the tool always
   has something to read; other tags earn a view at ≥5 uses.
-- Open loops needed no cut-off horizon: everything unchecked is listed
-  and the age buckets do the prioritizing (question 2 below is now
-  optional polish, not a blocker).
+- Open loops shipped first with age buckets and no horizon; reworked to
+  v2 the same day after the founder's live testing (see A2 above): 10-day
+  active window, never-closed archive, carried-forward dedupe.
 - `dayos_view("list")` (or any unknown name) returns the available views,
   so the model self-corrects in one round.
 - When `metrics.csv` outgrows the tool-result cap, the view returns the
@@ -123,14 +136,29 @@ bot feel *aware* without being asked — it can notice "you're 4h behind
 your usual deep work and that lease task is 12 days old" in ordinary
 conversation instead of waiting for the right question.
 
+**✅ Built 2026-07-16, offline-tested. As-built notes:**
+
+- The two lines land right after the bank summary — before the
+  today/yesterday day bodies, so the size cap can never trim them away.
+- Week pulse comes straight off `metrics.csv` (this DayOS week's rows vs
+  the previous week's; top three categories by hours) and stays silent
+  when both weeks are empty — no noise before data exists.
+- The loops line reads the view files and includes the archive count:
+  `Open loops: 3 active (oldest 6d: "Call bank") · 12 never-closed.`
+- The snapshot's tool list now names `dayos_view` so the model knows the
+  views exist without being told.
+- Live after VPS `git pull` + restart + `/sync` (restart matters — the
+  pulse code runs inside the bot process).
+
 ## Phase C — the distillation ladder grows one rung
 
-- **Monthly synthesis** — `memory/digests/months/YYYY-MM.md`. Once a
-  month, one Sonnet call reads the month's 4–5 weekly syntheses + the
-  month rollup + the previous monthly, and writes the month's story:
-  trajectory, real deltas, patterns-of-patterns, the biggest open loop.
-  Delivered on Telegram like the Friday digest. ~$0.02/month, same budget
-  guards as `digests.py` (cap-checked, loud on failure).
+- **Monthly synthesis** — `memory/digests/months/YYYY-MM.md`. On the
+  **5th of every month** (founder decision 2026-07-16), one Sonnet call
+  reads the previous month's 4–5 weekly syntheses + the month rollup +
+  the monthly before it, and writes the month's story: trajectory, real
+  deltas, patterns-of-patterns, the biggest open loop. Delivered on
+  Telegram like the Friday digest. ~$0.02/month, same budget guards as
+  `digests.py` (cap-checked, loud on failure).
 - **Standing themes — `memory/digests/themes.md`.** The same monthly run
   maintains a compact list of recurring patterns ("leak days follow short
   sleep", "ships in bursts after planning resets") with first-seen /
@@ -175,23 +203,22 @@ reviews). No new logging habits, no schema change, no contract-doc churn.
 
 | Phase | Build effort | Ongoing cost | Done means |
 |---|---|---|---|
-| A — lenses ✅ built | one session | $0 | "all my insights from June" = one tool call with full text; "what's still pending?" answers with ages |
-| B — pulse | half a session (can ship with A) | ~100 tokens/msg | the bot brings up the week pulse or a stale loop unprompted, when relevant |
-| C — ladder | one session | ~$0.25/yr | "how did June go?" answered from the monthly; "what are my patterns?" from `themes.md` |
+| A — lenses ✅ built, founder-verified live | one session | $0 | "all my insights from June" = one tool call with full text; "what's still pending?" answers with ages |
+| B — pulse ✅ built | half a session (can ship with A) | ~100 tokens/msg | the bot brings up the week pulse or a stale loop unprompted, when relevant |
+| C — ladder (approved, next) | one session | ~$0.25/yr | "how did June go?" answered from the monthly; "what are my patterns?" from `themes.md` |
 
 A → B → C, in that order: `metrics.csv` powers the pulse, and the weekly
 syntheses power the monthly. Each phase is independently useful; stopping
 after A is a fine outcome.
 
-## Founder questions (answer whenever — none block Phase A)
+## Founder answers (recorded 2026-07-16)
 
-1. **Tags:** beyond the four specials, any tags that should always get a
-   view? (The ≥5-uses auto-threshold covers the rest.)
-2. **Open loops:** how far back should unchecked journal tasks count as
-   open — 30 days? 60? *(As built: no horizon — everything unchecked is
-   listed, bucketed by age. Answer only if you want old tasks dropped
-   entirely.)*
-3. **Monthly delivery:** 1st of the month, or first Friday (bundled with
-   that week's digest)?
-4. **Later rung:** want a quarterly synthesis once two or three monthlies
-   exist, or is monthly + themes enough?
+1. **Tags:** as recommended — the four specials always, the ≥5-uses
+   auto-threshold for everything else. *(No change needed.)*
+2. **Open loops:** active for **10 days**, then archived to a
+   **never-closed** category kept for perpetuity ("in case I want to know
+   in future what tends to fall here"). Plus, from his live testing:
+   carried-forward copies of the same task must show as ONE loop, not one
+   per day. *(Both built same day — see A2.)*
+3. **Monthly delivery:** the **5th of every month**.
+4. **Later rung:** **monthly + themes is enough** — no quarterly.

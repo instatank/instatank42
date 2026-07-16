@@ -15,9 +15,11 @@ Layout produced (under memory/dayos/):
                           full, newest first (special tags always; other
                           tags once used >= TAG_VIEW_MIN_USES times;
                           project tags excluded — projects/ covers those)
-    open-loops.md         everything still pending (unchecked journal tasks,
-                          latest-session pending items, today's DFT),
-                          grouped by age, oldest first
+    open-loops.md         still pending from the last ACTIVE_LOOP_DAYS days
+                          (deduped journal tasks, latest-session pending
+                          items, today's DFT), oldest first
+    never-closed.md       loops that outlived ACTIVE_LOOP_DAYS days, kept
+                          for perpetuity — what lingers is itself a signal
     metrics.csv           one row per day: hours by category, total, rating,
                           check-in metrics, DFT status, wins
     learning.md           full learning log, newest first
@@ -57,6 +59,9 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 # always get a view, even when empty; any other tag earns one by use count.
 SPECIAL_TAGS = ("#win", "#insight", "#1%", "#dft")
 TAG_VIEW_MIN_USES = 5
+# Open loops stay "active" this many days (founder decision 2026-07-16);
+# older ones move to the never-closed archive instead of nagging forever.
+ACTIVE_LOOP_DAYS = 10
 
 
 # --- Small helpers ---------------------------------------------------------
@@ -559,17 +564,47 @@ def render_tag_view(tag: str, entries: list) -> str:
     return "\n".join(L).rstrip() + "\n"
 
 
-def render_open_loops(raw: dict, bd: dict, today: str) -> str:
-    """Everything he said he'd do that isn't done, in one file: unchecked
+def _journal_loops(bd: dict) -> list:
+    """Unchecked journal tasks, deduped: DayOS journals carry an unfinished
+    task forward day after day, but one loop = one line (founder ask
+    2026-07-16). Occurrences group by normalized text; the LATEST copy
+    decides done-ness (ticking any copy that day closes the loop, and a task
+    re-added after being done is a fresh loop); the line is dated from the
+    start of the current unchecked streak, so age = how long it's been open."""
+    occ = {}   # normalized text -> {date: completed_that_day}
+    disp = {}  # normalized text -> display text
+    for d in sorted(bd["journals"]):
+        for task in bd["journals"][d].get("tasks") or []:
+            text = str(task.get("text") or "").strip() if isinstance(task, dict) else ""
+            if not text:
+                continue
+            norm = " ".join(text.lower().split())
+            day_map = occ.setdefault(norm, {})
+            day_map[d] = bool(day_map.get(d)) or bool(task.get("completed"))
+            disp[norm] = text
+    items = []
+    for norm, day_map in occ.items():
+        dates = sorted(day_map)
+        if day_map[dates[-1]]:
+            continue  # latest copy is ticked -> closed
+        since = dates[-1]
+        for d in reversed(dates):
+            if day_map[d]:
+                break
+            since = d
+        items.append((since, "journal task", disp[norm]))
+    return items
+
+
+def render_open_loops(raw: dict, bd: dict, today: str) -> tuple[str, str]:
+    """Everything he said he'd do that isn't done -> two files (founder
+    decisions 2026-07-16): open-loops.md holds loops from the last
+    ACTIVE_LOOP_DAYS days; anything older lands in never-closed.md, kept for
+    perpetuity so what tends to linger is itself visible. Sources: deduped
     journal tasks, pending[] from each project's LATEST session (older
     sessions' lists are superseded, not open), today's DFT if pending (older
-    pending DFTs auto-skip in the app — history, not loops). Grouped by age,
-    oldest first, so drops stare back."""
-    items = []  # (date, origin, text)
-    for d, j in bd["journals"].items():
-        for task in j.get("tasks") or []:
-            if isinstance(task, dict) and task.get("text") and not task.get("completed"):
-                items.append((d, "journal task", str(task["text"]).strip()))
+    pending DFTs auto-skip in the app — history, not loops). Oldest first."""
+    items = _journal_loops(bd)
 
     latest = {}  # project slug -> ((date, createdAt), session)
     for s in raw.get("sessions", {}).values():
@@ -589,36 +624,50 @@ def render_open_loops(raw: dict, bd: dict, today: str) -> str:
     if dft and dft.get("status") == "pending" and str(dft.get("text", "")).strip():
         items.append((today, "today's focus task", str(dft["text"]).strip()))
 
-    header = f"# Open loops — still pending as of {today}"
-    if not items:
-        return header + "\n\nNothing pending — all clear.\n"
-
     t_today = _parse_date(today)
 
     def age(d: str) -> int:
         pd = _parse_date(d)
         return (t_today - pd).days if (t_today and pd) else 0
 
-    buckets = {"Older than 30 days": [], "Last 30 days": [], "This week": []}
-    for d, origin, text in items:
-        a = age(d)
-        name = "This week" if a <= 7 else "Last 30 days" if a <= 30 else "Older than 30 days"
-        buckets[name].append((d, a, origin, text))
+    active = sorted(x for x in items if age(x[0]) <= ACTIVE_LOOP_DAYS)
+    stale = sorted(x for x in items if age(x[0]) > ACTIVE_LOOP_DAYS)
 
-    oldest = min(items)
-    L = [header, "",
-         f"{len(items)} open item(s). Oldest: {oldest[0]} ({age(oldest[0])}d) — \"{oldest[2]}\"."]
-    for name in ("Older than 30 days", "Last 30 days", "This week"):
-        rows = sorted(buckets[name])
-        if not rows:
-            continue
+    def lines(rows):
+        return [f"- {d} ({age(d)}d) {origin}: {text}" for d, origin, text in rows]
+
+    L = [f"# Open loops — still pending as of {today}", ""]
+    if active:
+        L.append(f"{len(active)} active loop(s) from the last {ACTIVE_LOOP_DAYS} "
+                 "days, oldest first.")
+        L.extend(lines(active))
+    else:
+        L.append(f"Nothing pending from the last {ACTIVE_LOOP_DAYS} days — all clear.")
+    if stale:
         L.append("")
-        L.append(f"## {name}")
-        L.extend(f"- {d} ({a}d) {origin}: {text}" for d, a, origin, text in rows)
+        L.append(f"({len(stale)} older item(s) live in the never-closed archive — "
+                 "dayos_view 'never closed'.)")
     L.append("")
-    L.append("(Rebuilt every sync — items drop off once done in DayOS. A task he "
-             "finished but never ticked stays listed: do it or delete it in the app.)")
-    return "\n".join(L).rstrip() + "\n"
+    L.append("(Rebuilt every sync — a loop closes once its task is ticked in "
+             "DayOS. Carried-forward copies of one task collapse into a single "
+             f"line, dated from when it first went open. After {ACTIVE_LOOP_DAYS} "
+             "days an item moves to never-closed.md.)")
+    active_md = "\n".join(L).rstrip() + "\n"
+
+    N = [f"# Never closed — loops that outlived {ACTIVE_LOOP_DAYS} days "
+         f"(as of {today})", ""]
+    if stale:
+        N.append(f"{len(stale)} item(s), oldest first — what tends to land here "
+                 "is a signal in itself.")
+        N.extend(lines(stale))
+        N.append("")
+        N.append("(An item leaves this list only when its task is finally ticked "
+                 "— or deleted — in DayOS.)")
+    else:
+        N.append(f"Nothing here yet — no loop has outlived {ACTIVE_LOOP_DAYS} days.")
+    never_md = "\n".join(N).rstrip() + "\n"
+
+    return active_md, never_md
 
 
 def render_metrics(bd: dict, metric_ids: list) -> str:
@@ -780,7 +829,7 @@ def build_all(raw: dict, today: str = "") -> dict:
         entries = [e for t in tags_ for e in tagged.get(t, [])]
         files[f"tags/{fname}.md"] = render_tag_view(" / ".join(tags_), entries)
 
-    files["open-loops.md"] = render_open_loops(raw, bd, today)
+    files["open-loops.md"], files["never-closed.md"] = render_open_loops(raw, bd, today)
     files["metrics.csv"] = render_metrics(bd, _metrics_columns(metric_labels, bd))
 
     files["index.md"] = _render_index(raw, bd, names)
@@ -820,6 +869,7 @@ def _render_index(raw: dict, bd: dict, project_names: list) -> str:
     L.append("")
     L.append("Layout: days/YYYY-MM-DD.md (daily digest) · weeks/<sunday>.md · "
              "months/YYYY-MM.md · projects/<slug>.md · tags/<tag>.md (per-tag "
-             "views) · open-loops.md (everything pending) · metrics.csv (one "
-             "row per day) · learning.md · raw/*.json (exact Firestore mirror)")
+             "views) · open-loops.md (pending, last 10 days) · never-closed.md "
+             "(loops that outlived 10 days) · metrics.csv (one row per day) · "
+             "learning.md · raw/*.json (exact Firestore mirror)")
     return "\n".join(L).rstrip() + "\n"

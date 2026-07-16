@@ -60,8 +60,9 @@ silent-failure defense actually fires. Ten minutes, one-time.
   founder asked for smarter organization of the DayOS bank itself. Adds
   mechanical lenses (tag views, open-loops ledger, `metrics.csv`), a
   week-pulse ambient line, and a monthly-synthesis + standing-themes rung
-  on top of this phase's weekly one. **Phase A (the lenses + `dayos_view`
-  tool) built + offline-tested same day**; B and C await founder review.
+  on top of this phase's weekly one. **Phase A live (founder-verified);
+  open-loops v2 + Phase B built 2026-07-16; Phase C approved (monthly on
+  the 5th + themes.md) — awaiting build.**
 
 ### Phase 4 — proactive loops (trust must precede this)
 
@@ -117,6 +118,7 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
 | 2026-07-12 | **`main` branch created** | Founder-approved; all prior `claude/*` branches merged into it. Sessions merge to `main` before ending. Default-branch flip in GitHub settings still owed by founder (one click). |
 | 2026-07-12 | **Proactive cadence: Friday-only first** | Daily briefs must be earned by the Friday loop proving useful. |
 | 2026-07-12 | **DayOS mirror approach confirmed** | Founder: "the mirror idea for time tracker/dayos sounds good to me" — matches what was built. |
+| 2026-07-16 | **DayOS organization: founder answers + open-loops rework** | Tags: as recommended (specials + ≥5-uses threshold). Open loops: **10-day active window**, then a **never-closed archive kept forever**; carried-forward journal copies collapse into one loop (his live-testing ask). Monthly synthesis: delivered the **5th of each month**. **Monthly + themes only — no quarterly.** Phase A founder-verified live; open-loops v2 + Phase B (prompt pulse) built same day; Phase C approved and next. |
 | 2026-07-16 | **YouTube links in the DayOS learning log auto-fetch SILENTLY, daily** | The one deliberate exception to confirm-first ingestion: logging a link in his own learning log is already the act of curation, so no Telegram confirmation and no success notification (option 2 of the fork offered; also his call that every-2h would be overkill — daily + on-`/sync` instead). Run crashes still hit the ⚠️ banner; per-video fetch failures retry 3× then park, visible in `/sync`. |
 
 ## Open items
@@ -140,11 +142,13 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
       DayOS learning page and `/sync` (walkthrough: `deploy/DEPLOY.md`
       § 9b). First real link also answers whether transcript fetch works
       from the VPS's IP or the paste fallbacks are the norm.
-- [ ] Founder: review `docs/DAYOS_ORGANIZATION.md` (the DayOS organization
-      plan) and answer its four questions — **Phase A is already built**
-      (2026-07-16) and goes live with the next VPS `git pull` + restart +
-      `/sync`; the review gates Phases B (prompt pulse) and C (monthly
-      synthesis + themes).
+- [x] Founder reviewed `docs/DAYOS_ORGANIZATION.md` + answered all four
+      questions (2026-07-16); Phase A verified live by him the same day.
+- [ ] Founder: VPS `git pull` + restart + `/sync` to take the open-loops
+      v2 rework + Phase B prompt pulse live.
+- [ ] Build Phase C of `docs/DAYOS_ORGANIZATION.md`: monthly synthesis on
+      the 5th of each month + standing `themes.md` (founder-approved
+      2026-07-16, config decided — just needs the session).
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).

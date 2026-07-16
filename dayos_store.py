@@ -166,6 +166,8 @@ def project(name: str) -> str:
 
 OPEN_LOOP_NAMES = ("open loops", "open-loops", "openloops", "open loop",
                    "loops", "open", "pending")
+NEVER_CLOSED_NAMES = ("never closed", "never-closed", "neverclosed", "never",
+                      "never closed loops")
 METRICS_NAMES = ("metrics", "metrics.csv", "numbers", "stats")
 
 
@@ -192,8 +194,9 @@ def _views_listing() -> str:
     tags_dir = DAYOS_DIR / "tags"
     tags = sorted(p.stem for p in tags_dir.glob("*.md")) if tags_dir.exists() else []
     tag_list = ", ".join("#" + t for t in tags) if tags else "(none yet — run /sync)"
-    return ("Available DayOS views: 'open loops' (everything still pending, by age), "
-            f"'metrics' (per-day numbers CSV), and tag views: {tag_list}")
+    return ("Available DayOS views: 'open loops' (still pending, last 10 days), "
+            "'never closed' (loops that outlived 10 days), 'metrics' (per-day "
+            f"numbers CSV), and tag views: {tag_list}")
 
 
 def view(name: str) -> str:
@@ -208,6 +211,11 @@ def view(name: str) -> str:
         if p.exists():
             return _with_notes(_cap(_read(p)))
         return "No open-loops view built yet — run /sync once to rebuild the mirror."
+    if s in NEVER_CLOSED_NAMES:
+        p = DAYOS_DIR / "never-closed.md"
+        if p.exists():
+            return _with_notes(_cap(_read(p)))
+        return "No never-closed view built yet — run /sync once to rebuild the mirror."
     if s in METRICS_NAMES:
         p = DAYOS_DIR / "metrics.csv"
         if p.exists():
@@ -240,8 +248,9 @@ def _search_files():
         if (DAYOS_DIR / sub).exists():
             for p in sorted((DAYOS_DIR / sub).glob("*.md"), reverse=True):
                 yield f"{sub[:-1]}:{p.stem}", p
-    if (DAYOS_DIR / "open-loops.md").exists():
-        yield "open-loops", DAYOS_DIR / "open-loops.md"
+    for stem in ("open-loops", "never-closed"):
+        if (DAYOS_DIR / f"{stem}.md").exists():
+            yield stem, DAYOS_DIR / f"{stem}.md"
     if (DAYOS_DIR / "tags").exists():
         for p in sorted((DAYOS_DIR / "tags").glob("*.md")):
             yield f"tag:{p.stem}", p
@@ -292,11 +301,88 @@ def search(query: str) -> str:
     return _with_notes(_cap(header + "\n" + "\n".join(hits)))
 
 
-# --- System-prompt snapshot -----------------------------------------------------
+# --- System-prompt snapshot + ambient pulse (Phase B) ---------------------------
+
+_LOOP_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2}) \((\d+)d\) ([^:]+): (.*)$")
+
+
+def _week_pulse(now=None) -> str:
+    """One ambient line: this week's hours (top categories) vs last week —
+    computed from metrics.csv at snapshot time, so awareness costs a file
+    read, never a model call. Empty string when there's nothing to say."""
+    path = DAYOS_DIR / "metrics.csv"
+    if not path.exists():
+        return ""
+    try:
+        lines = _read(path).splitlines()
+    except OSError:
+        return ""
+    if len(lines) < 2:
+        return ""
+    cols = lines[0].split(",")
+    try:
+        i_total = cols.index("total_h")
+    except ValueError:
+        return ""
+    cat_cols = [(i, c[:-2]) for i, c in enumerate(cols[:i_total]) if c.endswith("_h")]
+    now = now or memory.now()
+    this_ws = _week_start_of(now)
+    last_ws = _week_start_of(now - timedelta(days=7))
+    this_total = last_total = 0.0
+    per_cat: dict = {}
+    for row in lines[1:]:
+        vals = row.split(",")
+        try:
+            d, total = vals[0], float(vals[i_total] or 0)
+        except (ValueError, IndexError):
+            continue
+        if d >= this_ws:
+            this_total += total
+            for i, cid in cat_cols:
+                try:
+                    per_cat[cid] = per_cat.get(cid, 0.0) + float(vals[i] or 0)
+                except (ValueError, IndexError):
+                    pass
+        elif d >= last_ws:
+            last_total += total
+    if this_total == 0 and last_total == 0:
+        return ""
+    top = sorted(((v, c) for c, v in per_cat.items() if v >= 0.05), reverse=True)[:3]
+    cats = " · ".join(f"{dayos_digest.CATS.get(c, c)} {v:.1f}" for v, c in top)
+    return (f"Pulse: this week so far {this_total:.1f}h"
+            + (f" ({cats})" if cats else "")
+            + f" vs last week {last_total:.1f}h.")
+
+
+def _loops_pulse() -> str:
+    """One ambient line: how many loops are open and the oldest one, plus the
+    never-closed count — read off the view files the sync maintains."""
+    path = DAYOS_DIR / "open-loops.md"
+    if not path.exists():
+        return ""
+    try:
+        active = [m for ln in _read(path).splitlines() if (m := _LOOP_LINE.match(ln))]
+        never_path = DAYOS_DIR / "never-closed.md"
+        never = (sum(1 for ln in _read(never_path).splitlines() if _LOOP_LINE.match(ln))
+                 if never_path.exists() else 0)
+    except OSError:
+        return ""
+    if not active and not never:
+        return ""
+    if active:
+        oldest = active[0]  # the file is oldest-first
+        head = (f"Open loops: {len(active)} active "
+                f"(oldest {oldest.group(2)}d: \"{oldest.group(4)}\")")
+    else:
+        head = "Open loops: none active"
+    if never:
+        head += f" · {never} never-closed"
+    return head + "."
+
 
 def prompt_snapshot(max_chars: int = 2400) -> str:
-    """Compact ambient context: index summary + today + yesterday. Sits after
-    the prompt-cache breakpoint (it changes throughout the day)."""
+    """Compact ambient context: index summary + pulse + today + yesterday.
+    Sits after the prompt-cache breakpoint (it changes throughout the day)."""
     if not has_data():
         return ""
     parts = ["## DayOS (his time-tracking + journaling system)"]
@@ -311,9 +397,14 @@ def prompt_snapshot(max_chars: int = 2400) -> str:
         parts.append("\n".join(index.splitlines()[1:6]).strip())
     except OSError:
         pass
+    for pulse in (_week_pulse(), _loops_pulse()):
+        if pulse:
+            parts.append(pulse)
     parts.append(
         "Tools: search_dayos (find anything he wrote/did), dayos_day (one day's "
-        "full digest), dayos_period (week/month rollup), dayos_project (per-project log)."
+        "full digest), dayos_period (week/month rollup), dayos_project "
+        "(per-project log), dayos_view ('open loops' / 'never closed' / "
+        "'metrics' / '#tag' views)."
     )
     today = memory.now().strftime("%Y-%m-%d")
     yday = (memory.now() - timedelta(days=1)).strftime("%Y-%m-%d")

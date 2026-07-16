@@ -76,11 +76,16 @@ def fixture_raw() -> dict:
             D1: {"id": D1, "date": D1, "thoughts": "Good energy today.",
                  "reflection": "Focus held through the morning.",
                  "tasks": [{"id": "t1", "text": "Ship sync", "completed": True},
-                           {"id": "t2", "text": "Call bank", "completed": False}],
+                           {"id": "t2", "text": "Call bank", "completed": False},
+                           {"id": "t3", "text": "Pay rent", "completed": False}],
                  "tags": ["#win"],
                  "voiceNotes": [{"id": "v1", "title": "morning ramble", "durationSec": 32}]},
+            # next day: "Call bank" carried forward still open; "Pay rent" done
+            D2: {"id": D2, "date": D2, "thoughts": "Carrying tasks forward.",
+                 "tasks": [{"id": "t4", "text": "Call bank", "completed": False},
+                           {"id": "t5", "text": "Pay rent", "completed": True}]},
             D0: {"id": D0, "date": D0, "thoughts": "Planning month.",
-                 "tasks": [{"id": "t3", "text": "Renew lease", "completed": False}]},
+                 "tasks": [{"id": "t6", "text": "Renew lease", "completed": False}]},
         },
         "sessions": {
             "s1": {"id": "s1", "projectName": "DayOS", "date": D1, "durationMin": 90,
@@ -165,7 +170,7 @@ def test_digest_build():
 
 
 def test_lenses_build():
-    files = dayos_digest.build_all(fixture_raw(), today="2026-07-16")
+    files = dayos_digest.build_all(fixture_raw(), today="2026-07-05")
 
     # tag views: full entries, newest first; specials always exist (even empty)
     win = files["tags/win.md"]
@@ -179,19 +184,30 @@ def test_lenses_build():
     assert "tags/dayos.md" not in files                # project tag: projects/ covers it
     assert "tags/winner.md" not in files               # 1 use < threshold, not special
 
-    # open loops: bucketed by age, oldest first; done/superseded excluded
+    # open loops: 10-day active window, oldest first; done/superseded excluded
     loops = files["open-loops.md"]
-    assert "Older than 30 days" in loops and "Renew lease" in loops
-    assert "Last 30 days" in loops and "Call bank" in loops
-    assert "digests" in loops                          # latest session's pending
-    assert "stale pending item" not in loops           # older session superseded
-    assert "Ship sync" not in loops                    # completed task
-    assert "File taxes" not in loops                   # old pending DFT != today's
-    assert loops.index("Renew lease") < loops.index("Call bank")  # oldest stares first
+    never = files["never-closed.md"]
+    assert "digests" in loops                          # latest session's pending, 4d
+    assert "stale pending item" not in loops + never   # older session superseded
+    assert "Ship sync" not in loops + never            # completed task
+    assert "File taxes" not in loops + never           # old pending DFT != today's
+    # carried-forward copies collapse into ONE line, dated from first-open
+    assert "2026-07-01 (4d) journal task: Call bank" in loops
+    assert loops.count("Call bank") == 1
+    # ticking a later copy closes every earlier copy of the same task
+    assert "Pay rent" not in loops + never
+    # >10 days old -> the never-closed archive, not the active list
+    assert "Renew lease" not in loops
+    assert "2026-06-01 (34d) journal task: Renew lease" in never
+    assert "never-closed" in loops                     # active file points at it
 
     # today's pending DFT IS a loop when today matches
     loops_d0 = dayos_digest.build_all(fixture_raw(), today=D0)["open-loops.md"]
     assert "today's focus task: File taxes" in loops_d0
+
+    # session pendings age into never-closed too
+    never_aug = dayos_digest.build_all(fixture_raw(), today="2026-08-01")["never-closed.md"]
+    assert "digests" in never_aug
 
     # metrics.csv: header + exact per-day rows (hours, rating, metrics, dft, wins)
     metrics = files["metrics.csv"]
@@ -231,9 +247,14 @@ def test_persist_and_store():
 
 
 def test_views_store():
-    # (mirror already persisted + fresh status by test_persist_and_store)
-    assert "Renew lease" in dayos_store.view("open loops")
-    assert "Renew lease" in dayos_store.view("pending")          # forgiving names
+    # (mirror already persisted + fresh status by test_persist_and_store;
+    # persist uses the real clock, so every fixture loop has aged past the
+    # 10-day active window by now -> active list empty, archive populated)
+    loops = dayos_store.view("open loops")
+    assert "Open loops" in loops and "never-closed" in loops
+    assert "Open loops" in dayos_store.view("pending")           # forgiving names
+    never = dayos_store.view("never closed")
+    assert "Renew lease" in never and "Call bank" in never
     for q in ("#win", "win"):                                    # tag with or without '#'
         assert "Closed the deal" in dayos_store.view(q), q
     m = dayos_store.view("metrics")
@@ -241,7 +262,17 @@ def test_views_store():
     # unknown/list -> the listing, so the model self-corrects in one round
     for q in ("list", "", "#nonexistent"):
         out = dayos_store.view(q)
-        assert "open loops" in out and "#idea" in out, q
+        assert "open loops" in out and "never closed" in out and "#idea" in out, q
+
+    # Phase B pulses: week numbers from metrics.csv at a pinned "now"...
+    pulse = dayos_store._week_pulse(now=memory.datetime(2026, 7, 2))
+    assert "this week so far 4.0h" in pulse
+    assert "Deep Work 2.0" in pulse and "vs last week 0.0h" in pulse
+    # ...and the loops line straight off the view files (real clock: all aged out)
+    lp = dayos_store._loops_pulse()
+    assert lp.startswith("Open loops: none active") and "3 never-closed" in lp
+    snap = dayos_store.prompt_snapshot()
+    assert "never-closed" in snap and "dayos_view" in snap
 
     # metrics tail-capping keeps the header and the MOST RECENT rows
     csv = (dayos_store.DAYOS_DIR / "metrics.csv").read_text(encoding="utf-8")
@@ -254,7 +285,7 @@ def test_views_store():
 
     # the new views are searchable, after the primary files
     labels = [label for label, _ in dayos_store._search_files()]
-    assert "open-loops" in labels and "tag:win" in labels
+    assert "open-loops" in labels and "never-closed" in labels and "tag:win" in labels
     assert labels.index(D1) < labels.index("open-loops")
     print("ok views store")
 
@@ -277,7 +308,7 @@ def test_prune():
     raw = fixture_raw()
     dayos_sync.persist(raw)
     assert (dayos_store.DAYOS_DIR / "days" / f"{D2}.md").exists()
-    for coll in ("blocks", "captures"):
+    for coll in ("blocks", "captures", "dailyJournal"):
         raw[coll] = {k: v for k, v in raw[coll].items()
                      if not (v.get("date") == D2 or str(v.get("timestamp", "")).startswith(D2))}
     dayos_sync.persist(raw)
@@ -329,7 +360,8 @@ def test_bot_wiring():
     out = bot.handle_tool("dayos_project", {"name": "dayos"})
     assert "Plan the sync module" in out
     assert any(t["name"] == "dayos_view" for t in bot.current_tools())
-    assert "Renew lease" in bot.handle_tool("dayos_view", {"name": "open loops"})
+    assert "Open loops" in bot.handle_tool("dayos_view", {"name": "open loops"})
+    assert "Renew lease" in bot.handle_tool("dayos_view", {"name": "never closed"})
     assert "Closed the deal" in bot.handle_tool("dayos_view", {"name": "#win"})
     assert "Unknown tool" in bot.handle_tool("bogus", {})
     # tool errors come back as text, never exceptions

@@ -85,19 +85,25 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   crashed run does hit the ⚠️ banner.
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
-- **DayOS organization: plan written; Phase A BUILT + tested offline**
-  (2026-07-16): `docs/DAYOS_ORGANIZATION.md` — four-layer frame (raw →
-  mechanical lenses → AI distillation → ambient prompt). Phase A (built):
-  `memory/dayos/tags/<tag>.md` per-tag views (specials #win/#insight/#1%/
-  #dft always; other tags at ≥5 uses; project tags excluded — projects/
-  covers them), `open-loops.md` (unchecked journal tasks + latest-session
-  pending items + today's DFT, age-bucketed, oldest first), `metrics.csv`
-  (one row per day: hours by category, rating, check-in metrics, DFT,
-  wins) — all rebuilt inside the existing sync at $0, searchable, read
-  via new bot tool `dayos_view` ('open loops' / 'metrics' / '#tag' /
-  'list'). Live after VPS `git pull` + restart + `/sync` (no new config,
-  no new timer). Phases B (prompt pulse) + C (monthly synthesis +
-  `themes.md`) await founder review of the doc.
+- **DayOS organization: Phase A LIVE (founder-verified 2026-07-16);
+  open-loops v2 + Phase B (prompt pulse) built + tested same day**:
+  `docs/DAYOS_ORGANIZATION.md` — four-layer frame (raw → mechanical
+  lenses → AI distillation → ambient prompt). Phase A: `memory/dayos/
+  tags/<tag>.md` per-tag views (specials #win/#insight/#1%/#dft always;
+  other tags at ≥5 uses; project tags excluded — projects/ covers them),
+  `metrics.csv` (one row per day: hours by category, rating, check-in
+  metrics, DFT, wins), and the open-loops ledger — **v2 after founder
+  answers + live testing**: carried-forward journal copies collapse into
+  ONE loop dated from first-open; 10-day active window in
+  `open-loops.md`; older items archive forever in `never-closed.md`. All
+  rebuilt inside the existing sync at $0, read via bot tool `dayos_view`
+  ('open loops' / 'never closed' / 'metrics' / '#tag' / 'list'). Phase B:
+  two ambient lines in the prompt snapshot — week pulse (this week's
+  hours + top categories vs last week, from metrics.csv) + open-loops
+  line (active count, oldest, never-closed count), placed before the day
+  bodies so the cap can't trim them. v2+B live after VPS `git pull` +
+  restart + `/sync`. **Phase C approved** (founder answers in the doc:
+  monthly synthesis on the 5th + `themes.md`, no quarterly) — next build.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
   `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
@@ -205,7 +211,7 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `dayos_sync.py` — pull orchestrator + CLI (`--full/--recent/--status`),
   writes `memory/dayos/` + `sync_status.json`
 - `dayos_digest.py` — pure raw→markdown transforms (days/weeks/months/
-  projects + the Phase A lenses: tags/, open-loops.md, metrics.csv)
+  projects + the lenses: tags/, open-loops.md, never-closed.md, metrics.csv)
 - `dayos_store.py` — read side: search/day/period/project/view, staleness
   warnings, prompt snapshot
 - `playbook_sync.py` — git-mirror orchestrator + CLI (`--status`), writes
