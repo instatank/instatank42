@@ -43,11 +43,12 @@ THIS_WEEK = digests.week_start_of(memory.now())
 LAST_MONTH = digests.resolve_month("last")
 
 
-def fake_client(reply_text="**The week in one line**\nSolid deep-work week."):
+def fake_client(reply_text="**The week in one line**\nSolid deep-work week.",
+                stop_reason="end_turn"):
     usage = SimpleNamespace(input_tokens=2000, output_tokens=400,
                             cache_creation_input_tokens=0, cache_read_input_tokens=0)
-    response = SimpleNamespace(
-        content=[SimpleNamespace(type="text", text=reply_text)], usage=usage)
+    content = [SimpleNamespace(type="text", text=reply_text)] if reply_text else []
+    response = SimpleNamespace(content=content, usage=usage, stop_reason=stop_reason)
     calls = []
 
     class Messages:
@@ -96,9 +97,43 @@ def test_generate():
     assert "Solid deep-work week." in stored
     assert budget.today_spend() > spend_before            # cost hit the ledger
     assert client.calls[0]["model"] == digests.MODEL
+    assert client.calls[0]["thinking"] == {"type": "disabled"}  # see empty-reply test below
     status = json.loads(digests.STATUS_PATH.read_text())
     assert status["week"] == THIS_WEEK
     print("ok generate")
+
+
+def test_empty_reply_raises_loud():
+    # Sonnet defaults to adaptive thinking when `thinking` is omitted, which
+    # can eat the whole (small) max_tokens budget and leave zero text — the
+    # exact bug this reproduces: a response with no text block at all. Must
+    # raise (and thus alert loudly on Telegram) rather than silently write a
+    # label-only file, which is what happened before this guard existed.
+    empty = fake_client(reply_text="", stop_reason="max_tokens")
+    try:
+        digests.generate_week("", empty)
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as e:
+        assert "no synthesis text" in str(e) and "max_tokens" in str(e)
+
+    empty_m = fake_client(reply_text="", stop_reason="max_tokens")
+    try:
+        digests.generate_month("2025-11", empty_m)
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as e:
+        assert "no synthesis text" in str(e) and "max_tokens" in str(e)
+    assert not digests.month_path("2025-11").exists()      # nothing written on failure
+
+    # edge case: text present but nothing BEFORE the marker (would otherwise
+    # write the exact "label with no content" bug the founder hit)
+    marker_first = fake_client("===THEMES===\n- some theme")
+    try:
+        digests.generate_month("2025-10", marker_first)
+        raise AssertionError("expected RuntimeError")
+    except RuntimeError as e:
+        assert "no month-synthesis text" in str(e)
+    assert not digests.month_path("2025-10").exists()
+    print("ok empty reply raises loud")
 
 
 def test_resolve_month():
@@ -130,6 +165,7 @@ def test_generate_month():
     result = digests.generate_month("last", client)
     assert result["month"] == LAST_MONTH and result["themes_updated"]
     assert client.calls[0]["max_tokens"] == digests.MAX_TOKENS_MONTH
+    assert client.calls[0]["thinking"] == {"type": "disabled"}
     stored = digests.load(LAST_MONTH)
     assert "Agent-written monthly synthesis" in stored    # the opinion label
     assert "grinding, honest month" in stored
@@ -199,6 +235,7 @@ if __name__ == "__main__":
         test_resolve_and_load_missing()
         test_build_input()
         test_generate()
+        test_empty_reply_raises_loud()
         test_resolve_month()
         test_generate_month()
         test_budget_cap_blocks_generation()

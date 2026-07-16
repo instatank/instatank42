@@ -247,11 +247,16 @@ def generate_week(week_start: str = "", client=None) -> dict:
         model=MODEL,
         max_tokens=MAX_TOKENS,
         system=SYSTEM,
+        thinking={"type": "disabled"},
         messages=[{"role": "user", "content": build_input(week)}],
     )
     cost = budget.cost_of(MODEL, response.usage)
     budget.add_spend(cost)
     text = "".join(b.text for b in response.content if b.type == "text").strip()
+    if not text:
+        raise RuntimeError(
+            f"model returned no synthesis text (stop_reason="
+            f"{getattr(response, 'stop_reason', '?')}) — cost was still recorded; try again")
     out = LABEL.format(week=week) + text
     DIGESTS_DIR.mkdir(parents=True, exist_ok=True)
     path_for(week).write_text(out, encoding="utf-8")
@@ -336,16 +341,25 @@ def generate_month(month_key: str = "", client=None) -> dict:
         model=MODEL,
         max_tokens=MAX_TOKENS_MONTH,
         system=MONTH_SYSTEM,
+        thinking={"type": "disabled"},
         messages=[{"role": "user", "content": build_month_input(ym)}],
     )
     cost = budget.cost_of(MODEL, response.usage)
     budget.add_spend(cost)
     text = "".join(b.text for b in response.content if b.type == "text").strip()
+    if not text:
+        raise RuntimeError(
+            f"model returned no synthesis text (stop_reason="
+            f"{getattr(response, 'stop_reason', '?')}) — cost was still recorded; try again")
 
     if THEMES_MARKER in text:
         month_part, themes_part = (s.strip() for s in text.split(THEMES_MARKER, 1))
     else:
         month_part, themes_part = text, ""
+    if not month_part:
+        raise RuntimeError(
+            "model reply had no month-synthesis text before the ===THEMES=== "
+            "marker — cost was still recorded; try again")
     out = MONTH_LABEL.format(ym=ym) + month_part
     month_path(ym).parent.mkdir(parents=True, exist_ok=True)
     month_path(ym).write_text(out, encoding="utf-8")

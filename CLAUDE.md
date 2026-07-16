@@ -180,8 +180,18 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - **Cache breakpoint placement**: system = [static prompt, profile(cache_control),
   recent session notes]. Volatile notes sit after the breakpoint on purpose.
 - **Sonnet 5 quirk**: omitting `thinking` runs adaptive thinking by default
-  (spends thinking tokens inside max_tokens). Currently accepted — replies are
-  capped at 1000 tokens anyway. If Sonnet replies get truncated, that's why.
+  (spends thinking tokens inside max_tokens). Accepted for live chat turns —
+  replies are capped at 1000 tokens anyway. **Bit us for real in
+  `digests.py`** (2026-07-16): the monthly synthesis's small `max_tokens`
+  budget (1200) got fully consumed by invisible thinking, so the model
+  returned zero text and the bot wrote a file with just the "Agent-written
+  monthly synthesis for ..." label and no content — silently, until the
+  founder noticed. Fixed by passing `thinking={"type": "disabled"}` on both
+  `generate_week` and `generate_month`'s `messages.create` calls (any
+  one-shot batch write with a small max_tokens budget needs this — the
+  cost of thinking eating the whole reply is much higher than for a chat
+  turn), plus a guard that raises loudly instead of writing an empty file
+  if the model ever returns no text anyway.
 - **Budget math sanity check**: ~50 Haiku msgs/day ≈ $0.20–0.30/day ≈ $6–9/mo.
   VPS ≈ €4–5/mo. Total lands in the $10–15 target band.
 - **anthropic SDK is sync**; called via `asyncio.to_thread` from the async
