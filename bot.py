@@ -172,6 +172,28 @@ DAYOS_TOOLS = [
             "required": ["name"],
         },
     },
+    {
+        "name": "dayos_view",
+        "description": (
+            "Read one of the DayOS bank's cross-cutting views. 'open loops': "
+            "everything he said he'd do that is still pending (unchecked journal "
+            "tasks, pending session items, today's focus task), grouped by age "
+            "with the oldest first — use for 'what's still pending / what am I "
+            "dropping'. 'metrics': a CSV with one row per day (hours by category, "
+            "total, day rating, check-in metrics, focus-task status, wins) — use "
+            "for trends and correlations across many days. A '#tag' (e.g. '#win', "
+            "'#insight'): every entry carrying that tag in full, newest first — "
+            "use for 'show me all my wins/insights'. 'list' shows all views."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string",
+                         "description": "'open loops', 'metrics', a '#tag', or 'list'."}
+            },
+            "required": ["name"],
+        },
+    },
 ]
 
 
@@ -352,6 +374,8 @@ def handle_tool(name: str, args: dict) -> str:
             return dayos_store.period(args.get("period", "this week"))
         if name == "dayos_project":
             return dayos_store.project(args.get("name", ""))
+        if name == "dayos_view":
+            return dayos_store.view(args.get("name", ""))
         if name == "search_playbook":
             return playbook_store.search(args.get("query", ""))
         if name == "playbook_doc":

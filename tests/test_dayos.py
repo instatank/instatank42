@@ -33,6 +33,7 @@ from dayos_client import decode_fields, decode_value
 
 # 2026-07-01 was a Wednesday; its DayOS week (Sunday-start) begins 2026-06-28.
 D1, D2, WEEK, MONTH = "2026-07-01", "2026-07-02", "2026-06-28", "2026-07"
+D0 = "2026-06-01"  # a month earlier — exercises the open-loops age buckets
 
 
 def fixture_raw() -> dict:
@@ -58,6 +59,18 @@ def fixture_raw() -> dict:
                    "body": "Long streak continues #winner", "tags": ["#winner"]},
             "c4": {"id": "c4", "timestamp": f"{D1}T23:00:00+05:30", "type": "note",
                    "body": "trashed note", "deletedAt": "2026-07-02T08:00:00+05:30"},
+            # five #idea uses -> earns an auto tag view; i5 also pushes #dayos
+            # to five uses, which must STILL not get a view (project tag)
+            "i1": {"id": "i1", "timestamp": f"{D0}T10:00:00+05:30", "type": "note",
+                   "body": "Automate journal imports", "tags": ["#idea"]},
+            "i2": {"id": "i2", "timestamp": f"{D0}T11:00:00+05:30", "type": "note",
+                   "body": "Morning-brief bot", "tags": ["#idea"]},
+            "i3": {"id": "i3", "timestamp": f"{D0}T12:00:00+05:30", "type": "note",
+                   "body": "Weekly metrics email", "tags": ["#idea"]},
+            "i4": {"id": "i4", "timestamp": f"{D0}T13:00:00+05:30", "type": "note",
+                   "body": "Voice-first capture", "tags": ["#idea"]},
+            "i5": {"id": "i5", "timestamp": f"{D0}T14:00:00+05:30", "type": "note",
+                   "body": "Tag heatmap view", "tags": ["#idea", "#dayos"]},
         },
         "dailyJournal": {
             D1: {"id": D1, "date": D1, "thoughts": "Good energy today.",
@@ -66,12 +79,17 @@ def fixture_raw() -> dict:
                            {"id": "t2", "text": "Call bank", "completed": False}],
                  "tags": ["#win"],
                  "voiceNotes": [{"id": "v1", "title": "morning ramble", "durationSec": 32}]},
+            D0: {"id": D0, "date": D0, "thoughts": "Planning month.",
+                 "tasks": [{"id": "t3", "text": "Renew lease", "completed": False}]},
         },
         "sessions": {
             "s1": {"id": "s1", "projectName": "DayOS", "date": D1, "durationMin": 90,
                    "before": "Plan the sync module", "during": "Wrote the client",
                    "after": "It works", "done": ["client"], "pending": ["digests"],
                    "learned": ["REST beats grpc here"], "tags": ["#dayos"]},
+            # an OLDER session whose pending list is superseded by s1's
+            "s0": {"id": "s0", "projectName": "DayOS", "date": "2026-06-20",
+                   "pending": ["stale pending item"]},
         },
         "learning": {
             "l1": {"id": "l1", "sourceName": "Deep Work", "sourceType": "book",
@@ -81,7 +99,8 @@ def fixture_raw() -> dict:
         "ratings": {D1: {"rating": 4}},
         "life_ratings": {D1: {"habit_stacking": 4, "mindset": 3}},
         "eod": {D1: {"text": "Solid day overall."}},
-        "dfts": {D1: {"text": "Ship the sync module", "status": "done"}},
+        "dfts": {D1: {"text": "Ship the sync module", "status": "done"},
+                 D0: {"text": "File taxes", "status": "pending"}},
         "weeklyReviews": {WEEK: {"weekStart": WEEK, "intention": "Focus on DayOS",
                                  "aiSummary": "A strong, focused week."}},
         "monthlyReviews": {MONTH: {"month": MONTH, "oneFocus": "Deep work volume"}},
@@ -145,6 +164,47 @@ def test_digest_build():
     print("ok digest build")
 
 
+def test_lenses_build():
+    files = dayos_digest.build_all(fixture_raw(), today="2026-07-16")
+
+    # tag views: full entries, newest first; specials always exist (even empty)
+    win = files["tags/win.md"]
+    assert "2 entries" in win
+    assert "Closed the deal" in win                    # tagged capture, in full
+    assert "Thoughts: Good energy today." in win       # tagged journal, in full
+    idea = files["tags/idea.md"]
+    assert "5 entries" in idea and "Tag heatmap view" in idea
+    assert files["tags/insight.md"].startswith("# #insight — no entries yet")
+    assert "tags/1%.md" in files and "tags/dft.md" in files
+    assert "tags/dayos.md" not in files                # project tag: projects/ covers it
+    assert "tags/winner.md" not in files               # 1 use < threshold, not special
+
+    # open loops: bucketed by age, oldest first; done/superseded excluded
+    loops = files["open-loops.md"]
+    assert "Older than 30 days" in loops and "Renew lease" in loops
+    assert "Last 30 days" in loops and "Call bank" in loops
+    assert "digests" in loops                          # latest session's pending
+    assert "stale pending item" not in loops           # older session superseded
+    assert "Ship sync" not in loops                    # completed task
+    assert "File taxes" not in loops                   # old pending DFT != today's
+    assert loops.index("Renew lease") < loops.index("Call bank")  # oldest stares first
+
+    # today's pending DFT IS a loop when today matches
+    loops_d0 = dayos_digest.build_all(fixture_raw(), today=D0)["open-loops.md"]
+    assert "today's focus task: File taxes" in loops_d0
+
+    # metrics.csv: header + exact per-day rows (hours, rating, metrics, dft, wins)
+    metrics = files["metrics.csv"]
+    lines = metrics.splitlines()
+    assert lines[0] == ("date,deep_work_h,learning_h,practice_h,routine_h,"
+                        "leisure_h,leaks_h,total_h,rating,habit_stacking,"
+                        "mindset,dft_status,wins")
+    assert "2026-07-01,2.00,0.00,0.00,1.00,0.00,0.00,3.00,4,4,3,done,2" in lines
+    assert "2026-07-02,0.00,1.00,0.00,0.00,0.00,0.00,1.00,,,,,0" in lines
+    assert lines[1].startswith(D0)                     # rows ascending
+    print("ok lenses build")
+
+
 def test_persist_and_store():
     raw = fixture_raw()
     dayos_sync.persist(raw)
@@ -168,6 +228,35 @@ def test_persist_and_store():
         assert "Plan the sync module" in dayos_store.project(query), query
     assert "Known projects: dayos" in dayos_store.project("nonexistent")
     print("ok persist/store")
+
+
+def test_views_store():
+    # (mirror already persisted + fresh status by test_persist_and_store)
+    assert "Renew lease" in dayos_store.view("open loops")
+    assert "Renew lease" in dayos_store.view("pending")          # forgiving names
+    for q in ("#win", "win"):                                    # tag with or without '#'
+        assert "Closed the deal" in dayos_store.view(q), q
+    m = dayos_store.view("metrics")
+    assert "deep_work_h" in m and "2026-07-01,2.00" in m
+    # unknown/list -> the listing, so the model self-corrects in one round
+    for q in ("list", "", "#nonexistent"):
+        out = dayos_store.view(q)
+        assert "open loops" in out and "#idea" in out, q
+
+    # metrics tail-capping keeps the header and the MOST RECENT rows
+    csv = (dayos_store.DAYOS_DIR / "metrics.csv").read_text(encoding="utf-8")
+    lines = csv.splitlines()
+    room_for_last_row_only = len(lines[0]) + 80 + len(lines[-1]) + 2
+    tail = dayos_store._metrics_tail(csv, room_for_last_row_only)
+    assert tail.startswith("(showing the most recent")
+    assert "date,deep_work_h" in tail
+    assert D2 in tail and D0 not in tail               # newest kept, oldest dropped
+
+    # the new views are searchable, after the primary files
+    labels = [label for label, _ in dayos_store._search_files()]
+    assert "open-loops" in labels and "tag:win" in labels
+    assert labels.index(D1) < labels.index("open-loops")
+    print("ok views store")
 
 
 def test_search_semantics():
@@ -195,6 +284,20 @@ def test_prune():
     assert not (dayos_store.DAYOS_DIR / "days" / f"{D2}.md").exists()
     dayos_sync.persist(fixture_raw())  # restore for later tests
     print("ok prune")
+
+
+def test_tag_view_prune():
+    # a tag that falls below the threshold loses its view; specials never do
+    raw = fixture_raw()
+    dayos_sync.persist(raw)
+    assert (dayos_store.DAYOS_DIR / "tags" / "idea.md").exists()
+    raw["captures"] = {k: v for k, v in raw["captures"].items()
+                       if "#idea" not in (v.get("tags") or [])}
+    dayos_sync.persist(raw)
+    assert not (dayos_store.DAYOS_DIR / "tags" / "idea.md").exists()
+    assert (dayos_store.DAYOS_DIR / "tags" / "win.md").exists()
+    dayos_sync.persist(fixture_raw())  # restore for later tests
+    print("ok tag view prune")
 
 
 def test_staleness():
@@ -225,6 +328,9 @@ def test_bot_wiring():
     assert "Deep work volume" in out
     out = bot.handle_tool("dayos_project", {"name": "dayos"})
     assert "Plan the sync module" in out
+    assert any(t["name"] == "dayos_view" for t in bot.current_tools())
+    assert "Renew lease" in bot.handle_tool("dayos_view", {"name": "open loops"})
+    assert "Closed the deal" in bot.handle_tool("dayos_view", {"name": "#win"})
     assert "Unknown tool" in bot.handle_tool("bogus", {})
     # tool errors come back as text, never exceptions
     assert "Tool error" in bot.handle_tool("remember_fact", {})  # missing arg
@@ -253,9 +359,12 @@ if __name__ == "__main__":
     try:
         test_decode()
         test_digest_build()
+        test_lenses_build()
         test_persist_and_store()
+        test_views_store()
         test_search_semantics()
         test_prune()
+        test_tag_view_prune()
         test_staleness()
         test_bot_wiring()
         test_sync_status_written_on_error()

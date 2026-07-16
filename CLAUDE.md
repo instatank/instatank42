@@ -85,14 +85,19 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   crashed run does hit the ⚠️ banner.
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
-- **DayOS organization plan written, awaiting founder review** (2026-07-16):
-  `docs/DAYOS_ORGANIZATION.md` — how the DayOS bank gets smarter for
-  minimal effort. Four-layer frame (raw → mechanical lenses → AI
-  distillation → ambient prompt); Phase A adds tag views, an open-loops
-  ledger, and a per-day `metrics.csv` (all pure code in the existing
-  sync, $0), Phase B adds a week-pulse + open-loops line to the prompt
-  snapshot, Phase C adds a monthly synthesis + standing `themes.md`
-  (~$0.25/yr). No app changes, no schema changes, nothing built yet.
+- **DayOS organization: plan written; Phase A BUILT + tested offline**
+  (2026-07-16): `docs/DAYOS_ORGANIZATION.md` — four-layer frame (raw →
+  mechanical lenses → AI distillation → ambient prompt). Phase A (built):
+  `memory/dayos/tags/<tag>.md` per-tag views (specials #win/#insight/#1%/
+  #dft always; other tags at ≥5 uses; project tags excluded — projects/
+  covers them), `open-loops.md` (unchecked journal tasks + latest-session
+  pending items + today's DFT, age-bucketed, oldest first), `metrics.csv`
+  (one row per day: hours by category, rating, check-in metrics, DFT,
+  wins) — all rebuilt inside the existing sync at $0, searchable, read
+  via new bot tool `dayos_view` ('open loops' / 'metrics' / '#tag' /
+  'list'). Live after VPS `git pull` + restart + `/sync` (no new config,
+  no new timer). Phases B (prompt pulse) + C (monthly synthesis +
+  `themes.md`) await founder review of the doc.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
   `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
@@ -133,9 +138,9 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - **Second brain = memory banks, all plain files** (see `docs/SECOND_BRAIN.md`).
   DayOS is the first external bank: `dayos_sync.py` mirrors Firestore read-only
   into `memory/dayos/` (markdown digests + raw JSON) on a 2h systemd timer with
-  a daily full re-pull; the bot gets 4 read tools (`search_dayos`, `dayos_day`,
-  `dayos_period`, `dayos_project`) + a today/yesterday snapshot in the system
-  prompt + `/sync`. Firestore access is raw REST with a service-account JWT
+  a daily full re-pull; the bot gets 5 read tools (`search_dayos`, `dayos_day`,
+  `dayos_period`, `dayos_project`, `dayos_view`) + a today/yesterday snapshot
+  in the system prompt + `/sync`. Firestore access is raw REST with a service-account JWT
   (same pattern as DayOS's own cron) — deliberately NO firebase-admin/grpc.
   The agent never writes to DayOS. Staleness/sync failures surface loudly in
   tool results — don't strip those warnings.
@@ -199,9 +204,10 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
 - `dayos_client.py` — read-only Firestore REST client (service-account JWT)
 - `dayos_sync.py` — pull orchestrator + CLI (`--full/--recent/--status`),
   writes `memory/dayos/` + `sync_status.json`
-- `dayos_digest.py` — pure raw→markdown transforms (days/weeks/months/projects)
-- `dayos_store.py` — read side: search/day/period/project, staleness warnings,
-  prompt snapshot
+- `dayos_digest.py` — pure raw→markdown transforms (days/weeks/months/
+  projects + the Phase A lenses: tags/, open-loops.md, metrics.csv)
+- `dayos_store.py` — read side: search/day/period/project/view, staleness
+  warnings, prompt snapshot
 - `playbook_sync.py` — git-mirror orchestrator + CLI (`--status`), writes
   `memory/playbook/` + `sync_status.json`
 - `playbook_store.py` — read side: search/doc lookup, staleness warnings,

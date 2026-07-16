@@ -11,8 +11,20 @@ Layout produced (under memory/dayos/):
                           weeks run Sunday-Saturday) + Weekly Review answers
     months/YYYY-MM.md     monthly rollup + Monthly Review answers
     projects/<slug>.md    per-project: sessions, notes, learning, hours
+    tags/<tag>.md         per-tag view: every entry carrying the tag, in
+                          full, newest first (special tags always; other
+                          tags once used >= TAG_VIEW_MIN_USES times;
+                          project tags excluded — projects/ covers those)
+    open-loops.md         everything still pending (unchecked journal tasks,
+                          latest-session pending items, today's DFT),
+                          grouped by age, oldest first
+    metrics.csv           one row per day: hours by category, total, rating,
+                          check-in metrics, DFT status, wins
     learning.md           full learning log, newest first
     index.md              overview: date range, totals, project list
+
+The tag/open-loops/metrics views are the Phase A lenses of
+docs/DAYOS_ORGANIZATION.md — pure restatements of raw, no model calls.
 
 Soft-deleted entries (deletedAt set) are excluded everywhere, matching what
 the DayOS UI shows. Tags are stored by DayOS with their leading '#'.
@@ -41,6 +53,11 @@ CTYPES = {
 }
 DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
+# Tag views (docs/DAYOS_ORGANIZATION.md Phase A): the app's special tags
+# always get a view, even when empty; any other tag earns one by use count.
+SPECIAL_TAGS = ("#win", "#insight", "#1%", "#dft")
+TAG_VIEW_MIN_USES = 5
+
 
 # --- Small helpers ---------------------------------------------------------
 
@@ -56,6 +73,14 @@ def project_slug(name: str) -> str:
     """Mirror of DayOS projectSlug(): lowercase, strip leading '#', keep [a-z0-9_%]."""
     s = str(name or "").lower().lstrip("#")
     return "".join(ch for ch in s if ch.isascii() and (ch.isalnum() or ch in "_%"))
+
+
+def tag_filename(tag: str) -> str:
+    """Safe filename stem for a tag view: '#win' -> 'win', '#1%' -> '1%'.
+    Anything outside [a-z0-9_%-] becomes '_' so odd tags can't escape tags/."""
+    s = str(tag or "").lower().lstrip("#").strip()
+    return "".join(ch if (ch.isascii() and (ch.isalnum() or ch in "_%-")) else "_"
+                   for ch in s)
 
 
 def _parse_date(s: str):
@@ -460,6 +485,169 @@ def render_learning(entries: list) -> str:
     return "\n".join(L).rstrip() + "\n"
 
 
+# --- Phase A lenses: tag views, open loops, metrics --------------------------
+
+def _collect_tagged(raw: dict) -> dict:
+    """{tag: [(date, time, header, body_lines)]} over every live entry that
+    carries tags — the raw material for the per-tag views."""
+    out = defaultdict(list)
+
+    def add(tags, date, time_s, head, body):
+        for t in {str(t).lower() for t in (tags or []) if t}:
+            out[t].append((str(date), str(time_s or ""), head, body))
+
+    for b in raw.get("blocks", {}).values():
+        if not_trashed(b) and b.get("date"):
+            head = (f"Block {b.get('start_time', '??:??')} "
+                    f"{int(_block_minutes(b))}m {_cat_label(b.get('category'))}")
+            if b.get("label"):
+                head += f" — {b['label']}"
+            body = [f"note: {b['note']}"] if b.get("note") else []
+            add(b.get("tags"), b["date"], b.get("start_time"), head, body)
+
+    for c in raw.get("captures", {}).values():
+        if not_trashed(c) and _cap_date(c):
+            head = f"{CTYPES.get(c.get('type'), c.get('type') or 'Note')} {_cap_time(c)}".strip()
+            body = [ln for ln in [str(c.get("body") or "").strip()] if ln]
+            add(c.get("tags"), _cap_date(c), _cap_time(c), head, body)
+
+    for j in raw.get("dailyJournal", {}).values():
+        if not_trashed(j) and j.get("date"):
+            body = []
+            if j.get("thoughts"):
+                body.append("Thoughts: " + str(j["thoughts"]).strip())
+            if j.get("reflection"):
+                body.append("Reflection: " + str(j["reflection"]).strip())
+            add(j.get("tags"), j["date"], "", "Daily Journal", body)
+
+    for s in raw.get("sessions", {}).values():
+        if not_trashed(s) and s.get("date"):
+            body = []
+            for field, label in (("before", "Before"), ("during", "During"), ("after", "After")):
+                if s.get(field):
+                    body.append(f"{label}: {str(s[field]).strip()}")
+            for field, label in (("done", "Done"), ("pending", "Pending"), ("learned", "Learned")):
+                items = [str(x).strip() for x in s.get(field) or [] if str(x).strip()]
+                if items:
+                    body.append(f"{label}: " + "; ".join(items))
+            add(s.get("tags"), s["date"], "", f"Session: {s.get('projectName', '?')}", body)
+
+    for e in raw.get("learning", {}).values():
+        if not_trashed(e) and e.get("date"):
+            body = []
+            if e.get("takeaway"):
+                body.append("Takeaway: " + str(e["takeaway"]).strip())
+            if e.get("fullNotes"):
+                body.append(str(e["fullNotes"]).strip())
+            add(e.get("tags"), e["date"], "", f"Learning: {e.get('sourceName', '?')}", body)
+
+    return out
+
+
+def render_tag_view(tag: str, entries: list) -> str:
+    """One tag's view: every entry in full, newest first, dated + labeled by
+    origin — a document, not a pile of search snippets."""
+    if not entries:
+        return f"# {tag} — no entries yet\n"
+    entries = sorted(entries, key=lambda x: (x[0], x[1]), reverse=True)
+    dates = [e[0] for e in entries]
+    L = [f"# {tag} — {len(entries)} entries ({min(dates)} → {max(dates)}), newest first"]
+    for date, _time, head, body in entries:
+        L.append("")
+        L.append(f"## {date} · {head}")
+        L.extend(body)
+    return "\n".join(L).rstrip() + "\n"
+
+
+def render_open_loops(raw: dict, bd: dict, today: str) -> str:
+    """Everything he said he'd do that isn't done, in one file: unchecked
+    journal tasks, pending[] from each project's LATEST session (older
+    sessions' lists are superseded, not open), today's DFT if pending (older
+    pending DFTs auto-skip in the app — history, not loops). Grouped by age,
+    oldest first, so drops stare back."""
+    items = []  # (date, origin, text)
+    for d, j in bd["journals"].items():
+        for task in j.get("tasks") or []:
+            if isinstance(task, dict) and task.get("text") and not task.get("completed"):
+                items.append((d, "journal task", str(task["text"]).strip()))
+
+    latest = {}  # project slug -> ((date, createdAt), session)
+    for s in raw.get("sessions", {}).values():
+        if not_trashed(s) and s.get("date") and s.get("projectName"):
+            slug = project_slug(s["projectName"])
+            key = (str(s["date"]), str(s.get("createdAt") or ""))
+            if slug not in latest or key > latest[slug][0]:
+                latest[slug] = (key, s)
+    for slug in sorted(latest):
+        s = latest[slug][1]
+        for p in s.get("pending") or []:
+            text = str(p).strip()
+            if text:
+                items.append((str(s["date"]), f"session · {s.get('projectName')}", text))
+
+    dft = bd["dfts"].get(today)
+    if dft and dft.get("status") == "pending" and str(dft.get("text", "")).strip():
+        items.append((today, "today's focus task", str(dft["text"]).strip()))
+
+    header = f"# Open loops — still pending as of {today}"
+    if not items:
+        return header + "\n\nNothing pending — all clear.\n"
+
+    t_today = _parse_date(today)
+
+    def age(d: str) -> int:
+        pd = _parse_date(d)
+        return (t_today - pd).days if (t_today and pd) else 0
+
+    buckets = {"Older than 30 days": [], "Last 30 days": [], "This week": []}
+    for d, origin, text in items:
+        a = age(d)
+        name = "This week" if a <= 7 else "Last 30 days" if a <= 30 else "Older than 30 days"
+        buckets[name].append((d, a, origin, text))
+
+    oldest = min(items)
+    L = [header, "",
+         f"{len(items)} open item(s). Oldest: {oldest[0]} ({age(oldest[0])}d) — \"{oldest[2]}\"."]
+    for name in ("Older than 30 days", "Last 30 days", "This week"):
+        rows = sorted(buckets[name])
+        if not rows:
+            continue
+        L.append("")
+        L.append(f"## {name}")
+        L.extend(f"- {d} ({a}d) {origin}: {text}" for d, a, origin, text in rows)
+    L.append("")
+    L.append("(Rebuilt every sync — items drop off once done in DayOS. A task he "
+             "finished but never ticked stays listed: do it or delete it in the app.)")
+    return "\n".join(L).rstrip() + "\n"
+
+
+def render_metrics(bd: dict, metric_ids: list) -> str:
+    """metrics.csv — one row per day with entries: hours by category, total,
+    day rating, each check-in metric, DFT status, wins. The machine-readable
+    spine for trend/correlation questions; dates ascending."""
+    cols = (["date"] + [f"{c}_h" for c in CATS] + ["total_h", "rating"]
+            + list(metric_ids) + ["dft_status", "wins"])
+    rows = [",".join(cols)]
+    for d in sorted(bd["all_dates"]):
+        total, per = _cat_totals(bd["blocks"].get(d, []))
+        row = [d]
+        row += [f"{per.get(c, 0) / 60:.2f}" for c in CATS]
+        row.append(f"{total / 60:.2f}")
+        rating = bd["ratings"].get(d)
+        row.append(str(rating) if rating else "")
+        life = bd["life"].get(d, {})
+        for m in metric_ids:
+            v = life.get(m)
+            row.append(str(v) if isinstance(v, (int, float)) else "")
+        dft = bd["dfts"].get(d)
+        row.append(str(dft.get("status", "")) if dft else "")
+        wins = sum(1 for doc in (bd["captures"].get(d, []) + bd["journals_list"].get(d, []))
+                   if "#win" in (doc.get("tags") or []))
+        row.append(str(wins))
+        rows.append(",".join(row))
+    return "\n".join(rows) + "\n"
+
+
 # --- Top-level build ---------------------------------------------------------
 
 def _index_by_date(raw: dict) -> dict:
@@ -512,11 +700,15 @@ def _metric_labels(raw: dict) -> dict:
     return labels
 
 
-def build_all(raw: dict) -> dict:
-    """raw = {collection: {doc_id: fields}} -> {relative_path: content}."""
+def build_all(raw: dict, today: str = "") -> dict:
+    """raw = {collection: {doc_id: fields}} -> {relative_path: content}.
+    `today` (YYYY-MM-DD) anchors the open-loops age buckets and the DFT
+    check; defaults to the newest date in the data so the function stays
+    pure/deterministic for tests. dayos_sync passes the real IST date."""
     files = {}
     bd = _index_by_date(raw)
     metric_labels = _metric_labels(raw)
+    today = today or (max(bd["all_dates"]) if bd["all_dates"] else "")
 
     for d in sorted(bd["all_dates"]):
         files[f"days/{d}.md"] = render_day(
@@ -571,8 +763,37 @@ def build_all(raw: dict) -> dict:
     if live_learning:
         files["learning.md"] = render_learning(live_learning)
 
+    # Phase A lenses (docs/DAYOS_ORGANIZATION.md): tag views — specials
+    # always, others by use count, project tags excluded (projects/ already
+    # gives those a richer view). Tags sharing a filename merge into one view.
+    tagged = _collect_tagged(raw)
+    project_slugs = {project_slug(n) for n in names if project_slug(n)}
+    view_tags = set(SPECIAL_TAGS) | {
+        t for t, entries in tagged.items()
+        if len(entries) >= TAG_VIEW_MIN_USES and project_slug(t) not in project_slugs
+    }
+    by_file = defaultdict(list)
+    for t in sorted(view_tags):
+        if tag_filename(t):
+            by_file[tag_filename(t)].append(t)
+    for fname, tags_ in by_file.items():
+        entries = [e for t in tags_ for e in tagged.get(t, [])]
+        files[f"tags/{fname}.md"] = render_tag_view(" / ".join(tags_), entries)
+
+    files["open-loops.md"] = render_open_loops(raw, bd, today)
+    files["metrics.csv"] = render_metrics(bd, _metrics_columns(metric_labels, bd))
+
     files["index.md"] = _render_index(raw, bd, names)
     return files
+
+
+def _metrics_columns(metric_labels: dict, bd: dict) -> list:
+    """Check-in metric columns: the app's configured order first, then any
+    extra ids seen in the data (sorted) so nothing logged is dropped."""
+    ids = list(metric_labels)
+    seen = {k for doc in bd["life"].values() for k, v in doc.items()
+            if isinstance(v, (int, float))}
+    return ids + sorted(seen - set(ids))
 
 
 def _render_index(raw: dict, bd: dict, project_names: list) -> str:
@@ -598,6 +819,7 @@ def _render_index(raw: dict, bd: dict, project_names: list) -> str:
         L.append("Projects: " + " · ".join(slugs))
     L.append("")
     L.append("Layout: days/YYYY-MM-DD.md (daily digest) · weeks/<sunday>.md · "
-             "months/YYYY-MM.md · projects/<slug>.md · learning.md · raw/*.json "
-             "(exact Firestore mirror)")
+             "months/YYYY-MM.md · projects/<slug>.md · tags/<tag>.md (per-tag "
+             "views) · open-loops.md (everything pending) · metrics.csv (one "
+             "row per day) · learning.md · raw/*.json (exact Firestore mirror)")
     return "\n".join(L).rstrip() + "\n"

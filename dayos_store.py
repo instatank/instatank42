@@ -14,6 +14,7 @@ import json
 import re
 from datetime import timedelta
 
+import dayos_digest
 import memory
 
 DAYOS_DIR = memory.MEMORY_DIR / "dayos"
@@ -161,11 +162,72 @@ def project(name: str) -> str:
     return f"No project file for '{name}'. Known projects: {listing}"
 
 
+# --- Cross-cutting views (Phase A of docs/DAYOS_ORGANIZATION.md) ---------------
+
+OPEN_LOOP_NAMES = ("open loops", "open-loops", "openloops", "open loop",
+                   "loops", "open", "pending")
+METRICS_NAMES = ("metrics", "metrics.csv", "numbers", "stats")
+
+
+def _metrics_tail(text: str, limit: int) -> str:
+    """metrics.csv grows forever and rows are ascending — keep the header and
+    as many of the MOST RECENT rows as fit, instead of _cap()'s head-cut."""
+    lines = text.splitlines()
+    if not lines or len(text) <= limit:
+        return text
+    header, rows = lines[0], lines[1:]
+    kept, size = [], len(header) + 80  # slack for the truncation note
+    for row in reversed(rows):
+        if size + len(row) + 1 > limit:
+            break
+        kept.append(row)
+        size += len(row) + 1
+    kept.reverse()
+    note = (f"(showing the most recent {len(kept)} of {len(rows)} days — "
+            "ask for a specific period for older data)")
+    return "\n".join([note, header] + kept)
+
+
+def _views_listing() -> str:
+    tags_dir = DAYOS_DIR / "tags"
+    tags = sorted(p.stem for p in tags_dir.glob("*.md")) if tags_dir.exists() else []
+    tag_list = ", ".join("#" + t for t in tags) if tags else "(none yet — run /sync)"
+    return ("Available DayOS views: 'open loops' (everything still pending, by age), "
+            f"'metrics' (per-day numbers CSV), and tag views: {tag_list}")
+
+
+def view(name: str) -> str:
+    """The cross-cutting views the sync builds: 'open loops', 'metrics', or a
+    '#tag' view. Anything unrecognized returns the listing so the model can
+    self-correct in one round."""
+    if not has_data():
+        return "No DayOS data synced yet — ask the user to run /sync first."
+    s = (name or "").strip().lower()
+    if s in OPEN_LOOP_NAMES:
+        p = DAYOS_DIR / "open-loops.md"
+        if p.exists():
+            return _with_notes(_cap(_read(p)))
+        return "No open-loops view built yet — run /sync once to rebuild the mirror."
+    if s in METRICS_NAMES:
+        p = DAYOS_DIR / "metrics.csv"
+        if p.exists():
+            return _with_notes(_metrics_tail(_read(p), MAX_RESULT_CHARS))
+        return "No metrics view built yet — run /sync once to rebuild the mirror."
+    if s not in ("", "list", "views", "help"):
+        fname = dayos_digest.tag_filename(s)
+        p = DAYOS_DIR / "tags" / f"{fname}.md"
+        if fname and p.exists():
+            return _with_notes(_cap(_read(p)))
+    return _views_listing()
+
+
 # --- Search -------------------------------------------------------------------
 
 def _search_files():
     """Yield (label, path) most-useful-first: days newest first, then projects,
-    learning, weeks, months."""
+    learning, weeks, months. The Phase A views come last on purpose — their
+    content restates entries the day files already carry, so when the hit cap
+    bites, the originals win and the restatements are what gets dropped."""
     if (DAYOS_DIR / "days").exists():
         for p in sorted((DAYOS_DIR / "days").glob("*.md"), reverse=True):
             yield p.stem, p
@@ -178,6 +240,11 @@ def _search_files():
         if (DAYOS_DIR / sub).exists():
             for p in sorted((DAYOS_DIR / sub).glob("*.md"), reverse=True):
                 yield f"{sub[:-1]}:{p.stem}", p
+    if (DAYOS_DIR / "open-loops.md").exists():
+        yield "open-loops", DAYOS_DIR / "open-loops.md"
+    if (DAYOS_DIR / "tags").exists():
+        for p in sorted((DAYOS_DIR / "tags").glob("*.md")):
+            yield f"tag:{p.stem}", p
 
 
 def search(query: str) -> str:

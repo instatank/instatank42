@@ -76,11 +76,11 @@ def persist(raw: dict) -> dict:
             dayos_store.RAW_DIR / f"{coll}.json",
             json.dumps(docs, ensure_ascii=False, indent=1, sort_keys=True),
         )
-    files = dayos_digest.build_all(raw)
+    files = dayos_digest.build_all(raw, today=memory.now().strftime("%Y-%m-%d"))
     changed = sum(_write_if_changed(dayos_store.DAYOS_DIR / rel, content)
                   for rel, content in files.items())
     # prune digests for data that no longer exists (e.g. hard-deleted entries)
-    for sub in ("days", "weeks", "months", "projects"):
+    for sub in ("days", "weeks", "months", "projects", "tags"):
         d = dayos_store.DAYOS_DIR / sub
         if d.exists():
             for p in d.glob("*.md"):

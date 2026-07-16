@@ -5,7 +5,8 @@ second brain into an intelligent system that maximizes insight for minimal
 effort. This is the plan of record for how the DayOS bank gets smarter.
 `SECOND_BRAIN.md` stays the architecture for memory banks in general; this
 doc is specifically about what shapes the DayOS data takes and why. Status:
-proposed — nothing below is built yet.*
+**Phase A built + offline-tested 2026-07-16** (live after VPS `git pull` +
+restart + `/sync`); Phases B and C await founder review of this doc.*
 
 ## The idea in one paragraph
 
@@ -28,7 +29,7 @@ data he already produces.
 | Layer | What | Cost | Status |
 |---|---|---|---|
 | 0 · Raw | `raw/*.json` — exact Firestore copy | $0 | ✅ exists |
-| 1 · Lenses | mechanical views: by time ✅, by project ✅, **by tag, open loops, numbers table** | $0 (pure code in the existing sync) | rest = **Phase A** |
+| 1 · Lenses | mechanical views: by time ✅, by project ✅, **by tag, open loops, numbers table** | $0 (pure code in the existing sync) | **Phase A — ✅ built 2026-07-16** |
 | 2 · Distillation | the AI's opinion lane in `memory/digests/`: weekly ✅, **monthly + standing themes** | ~$0.02 per call | rest = **Phase C** |
 | 3 · Ambient | what rides in every prompt: today+yesterday ✅, **week pulse + open loops** | ~100 tokens/msg | **Phase B** |
 
@@ -83,9 +84,28 @@ file read plus arithmetic instead of walking N rollups. Also the exact
 input Layers 2 and 3 need for honest deltas.
 
 **Wiring:** the new files join the existing search corpus, and one new
-read tool — working name `dayos_view` — exposes them: `dayos_view("open
-loops")`, `dayos_view("#win")`, `dayos_view("metrics")`. One tool, many
-views, so the bot's tool list stays small.
+read tool — `dayos_view` — exposes them: `dayos_view("open loops")`,
+`dayos_view("#win")`, `dayos_view("metrics")`. One tool, many views, so
+the bot's tool list stays small.
+
+**✅ Built 2026-07-16, offline-tested (`tests/test_dayos.py`). As-built
+notes:**
+
+- Project tags never get a tag view, even above the use threshold —
+  `projects/<slug>.md` already gives those a richer, typed view.
+- The four special tags' views exist even when empty, so the tool always
+  has something to read; other tags earn a view at ≥5 uses.
+- Open loops needed no cut-off horizon: everything unchecked is listed
+  and the age buckets do the prioritizing (question 2 below is now
+  optional polish, not a blocker).
+- `dayos_view("list")` (or any unknown name) returns the available views,
+  so the model self-corrects in one round.
+- When `metrics.csv` outgrows the tool-result cap, the view returns the
+  **most recent** rows, never the oldest.
+- The new views join search *last*, so when the hit cap bites, original
+  day-file entries win over the views' restatements of them.
+- Nothing new to deploy: the views rebuild inside the existing sync
+  (`git pull` + restart + `/sync` and they exist).
 
 ## Phase B — ambient awareness (the prompt pulse)
 
@@ -155,7 +175,7 @@ reviews). No new logging habits, no schema change, no contract-doc churn.
 
 | Phase | Build effort | Ongoing cost | Done means |
 |---|---|---|---|
-| A — lenses | one session | $0 | "all my insights from June" = one tool call with full text; "what's still pending?" answers with ages |
+| A — lenses ✅ built | one session | $0 | "all my insights from June" = one tool call with full text; "what's still pending?" answers with ages |
 | B — pulse | half a session (can ship with A) | ~100 tokens/msg | the bot brings up the week pulse or a stale loop unprompted, when relevant |
 | C — ladder | one session | ~$0.25/yr | "how did June go?" answered from the monthly; "what are my patterns?" from `themes.md` |
 
@@ -168,7 +188,9 @@ after A is a fine outcome.
 1. **Tags:** beyond the four specials, any tags that should always get a
    view? (The ≥5-uses auto-threshold covers the rest.)
 2. **Open loops:** how far back should unchecked journal tasks count as
-   open — 30 days? 60?
+   open — 30 days? 60? *(As built: no horizon — everything unchecked is
+   listed, bucketed by age. Answer only if you want old tasks dropped
+   entirely.)*
 3. **Monthly delivery:** 1st of the month, or first Friday (bundled with
    that week's digest)?
 4. **Later rung:** want a quarterly synthesis once two or three monthlies

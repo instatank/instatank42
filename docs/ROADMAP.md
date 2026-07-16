@@ -60,7 +60,8 @@ silent-failure defense actually fires. Ten minutes, one-time.
   founder asked for smarter organization of the DayOS bank itself. Adds
   mechanical lenses (tag views, open-loops ledger, `metrics.csv`), a
   week-pulse ambient line, and a monthly-synthesis + standing-themes rung
-  on top of this phase's weekly one. Awaiting founder review.
+  on top of this phase's weekly one. **Phase A (the lenses + `dayos_view`
+  tool) built + offline-tested same day**; B and C await founder review.
 
 ### Phase 4 — proactive loops (trust must precede this)
 
@@ -140,9 +141,10 @@ half-built sources; the brain grows source-by-source as the portfolio matures.
       § 9b). First real link also answers whether transcript fetch works
       from the VPS's IP or the paste fallbacks are the norm.
 - [ ] Founder: review `docs/DAYOS_ORGANIZATION.md` (the DayOS organization
-      plan — tag views, open-loops ledger, metrics table, monthly synthesis
-      + themes) and answer its four questions; Phase A can be built as soon
-      as the plan is approved.
+      plan) and answer its four questions — **Phase A is already built**
+      (2026-07-16) and goes live with the next VPS `git pull` + restart +
+      `/sync`; the review gates Phases B (prompt pulse) and C (monthly
+      synthesis + themes).
 - [ ] Update `NORTH_STAR.md` tier table in time-tracker at the next monthly
       review (instatank42: Parked → Tier 1 stop-gap; PartySpark → Tier 2 for
       the duration).
