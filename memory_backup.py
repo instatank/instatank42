@@ -29,15 +29,21 @@ jobs pre-configuration). The mirror lands under a `memory/` subfolder of the
 repo, so it sits alongside the repo's existing `sessions/` lane (the
 /save-to-brain session digests) without touching it.
 
-Safety: memory/ contains NO secrets by design — the .env and Firebase key live
-outside it (/opt/instatank-agent/.env, .firebase-sa.json). Rebuildable git-
-mirror checkouts inside memory/ (e.g. playbook/repo) are skipped: they'd bloat
-the backup with a whole other repo's history and re-clone on demand anyway.
+Safety: the app's own secrets live OUTSIDE memory/ (/opt/instatank-agent/.env,
+.firebase-sa.json), so they're never in scope here. But a user can paste an API
+key, git token, or password into a DayOS note, and that syncs into the mirror —
+so as a second line of defense, any recognizable key/token is **redacted from
+the backup COPY** before it's committed (the source under memory/ is never
+modified). This also stops GitHub push protection from rejecting the backup.
+Free-text passwords have no recognizable shape and can't be caught this way —
+those must be removed at the source in DayOS. Rebuildable git-mirror checkouts
+inside memory/ (e.g. playbook/repo) are skipped entirely.
 """
 
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -108,10 +114,50 @@ def _git(args: list, cwd=None) -> str:
     return proc.stdout
 
 
+# Recognizable secret formats — the same families GitHub's push protection
+# blocks on. We redact these from the backup COPY so a credential the founder
+# saved in a DayOS note never reaches the repo. This catches shaped keys/tokens,
+# NOT free-text passwords (which have no signature) — those must be removed at
+# the source in DayOS.
+_SECRET_PATTERNS = [
+    re.compile(r"sk-ant-[A-Za-z0-9_-]{16,}"),                 # Anthropic
+    re.compile(r"sk-proj-[A-Za-z0-9_-]{16,}"),                # OpenAI project key
+    re.compile(r"\bsk-[A-Za-z0-9]{32,}"),                     # OpenAI classic key
+    re.compile(r"github_pat_[A-Za-z0-9_]{20,}"),              # GitHub fine-grained token
+    re.compile(r"\bgh[oprsu]_[A-Za-z0-9]{20,}"),              # GitHub classic tokens
+    re.compile(r"\bglpat-[A-Za-z0-9_-]{16,}"),                # GitLab token
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),                      # AWS access key id
+    re.compile(r"\bAIza[0-9A-Za-z_-]{30,}"),                  # Google API key
+    re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"),            # Slack token
+    re.compile(r"\b(?:sk|rk|pk)_live_[A-Za-z0-9]{16,}"),      # Stripe live key
+    re.compile(r"\b[0-9]{8,10}:[A-Za-z0-9_-]{35}\b"),         # Telegram bot token
+    re.compile(r"-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----"),
+]
+_REDACTION = "[REDACTED-SECRET]"
+
+
+def _redact(text: str) -> str:
+    for pat in _SECRET_PATTERNS:
+        text = pat.sub(_REDACTION, text)
+    return text
+
+
+def _copy_file(src_file: Path, dst_file: Path) -> None:
+    """Copy one file into the backup, blanking recognizable keys/tokens from the
+    COPY. Binary/undecodable files copy byte-for-byte (they can't carry a text
+    token GitHub would flag). The source file is never modified."""
+    try:
+        text = src_file.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        shutil.copy2(src_file, dst_file)
+        return
+    dst_file.write_text(_redact(text), encoding="utf-8")
+
+
 def _copy_memory(dest: Path) -> int:
-    """Replace dest with a fresh copy of memory/, skipping `.git` dirs and any
-    nested git-mirror checkout wholesale (a dir containing `.git` = a mirrored
-    external repo, rebuildable). Returns the number of files copied."""
+    """Replace dest with a fresh, secret-redacted copy of memory/, skipping
+    `.git` dirs and any nested git-mirror checkout wholesale (a dir containing
+    `.git` = a mirrored external repo, rebuildable). Returns files copied."""
     src = memory.MEMORY_DIR
     if dest.exists():
         shutil.rmtree(dest)
@@ -126,7 +172,7 @@ def _copy_memory(dest: Path) -> int:
         rel = rootp.relative_to(src)
         (dest / rel).mkdir(parents=True, exist_ok=True)
         for f in sorted(files):
-            shutil.copy2(rootp / f, dest / rel / f)
+            _copy_file(rootp / f, dest / rel / f)
             count += 1
     return count
 

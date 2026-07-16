@@ -418,7 +418,10 @@ Obsidian vault).
 nano /opt/instatank-agent/.env
 ```
 
-Fill in (these lines are already there if you copied the newer `.env.example`):
+Add these two lines and fill in the token. (They're pre-filled **only** on a
+server set up from scratch with the current `.env.example` — an already-running
+server won't have them yet, so if you don't see them, just paste them in at the
+bottom of the file. That's normal, not a mistake.)
 
 ```
 BACKUP_REPO_URL=https://github.com/instatank/2ndbrain.git
@@ -438,13 +441,17 @@ folder with everything in it. After that it backs itself up every night at
 3:30am IST, only committing when something actually changed.
 
 **Notes:**
-- It runs **as a manual command with `sudo` won't work** for the same reason as
-  the others — always go through `systemctl start memory-backup.service` so it
-  loads `.env`. Check what happened with
-  `journalctl -u memory-backup.service --no-pager -n 20`.
+- Always run it through `systemctl start memory-backup.service` (not a bare
+  `python …` with `sudo`) so it loads `.env`. See what happened with
+  `journalctl -u memory-backup.service --no-pager -n 40`.
 - The token is scrubbed from every log and never written into the repo on disk.
-- Your brain has **no secrets in it** — passwords and keys live in `.env` and
-  the Firebase key file, which sit *outside* the backed-up folder.
+- **About secrets in your data:** the app's own keys live in `.env` and the
+  Firebase key file, *outside* the backed-up folder. But if you ever saved an
+  API key or token inside a DayOS note, the backup **automatically blanks it out
+  of the copy it pushes** (your DayOS data is left untouched) — so keys never
+  reach the repo. A free-text **password** typed into a note has no recognizable
+  shape and can't be auto-caught, so keep real passwords out of DayOS (use a
+  password manager) and delete any you've already stored there.
 - **Reading it in Obsidian:** clone the repo (`git clone …/2ndbrain.git`) and
   open the folder as a vault. Treat it as **read-only** — the server rewrites
   `memory/` every night, so anything you *write* belongs in DayOS or a separate

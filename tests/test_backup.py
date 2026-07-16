@@ -63,6 +63,10 @@ def _seed_memory():
     _write(memory.MEMORY_DIR / "whatsapp" / "chats" / "mom" / "2026-07.md", "chat\n")
     _write(memory.MEMORY_DIR / "youtube" / "videos" / "abc.md", "transcript\n")
     _write(memory.MEMORY_DIR / "dayos" / "days" / "2026-07-01.md", "a day\n")
+    # a DayOS note where the founder saved a real key — must be redacted from
+    # the backup copy (but never from the source)
+    _write(memory.MEMORY_DIR / "dayos" / "days" / "2026-07-02.md",
+           "reminder: anthropic key sk-ant-api03-" + "A" * 40 + " do not lose\n")
     # a nested checkout: has a .git dir -> the whole subtree must be skipped
     _write(memory.MEMORY_DIR / "playbook" / "repo" / ".git" / "HEAD", "ref: refs/heads/main\n")
     _write(memory.MEMORY_DIR / "playbook" / "repo" / "index.html", "<html>huge</html>\n")
@@ -105,6 +109,12 @@ def test_backup_roundtrip():
     # the repo's OTHER lane is untouched by the backup
     assert (v / "README.md").exists()
     assert (v / "sessions" / "2026" / "first.md").exists()
+    # the saved key is redacted in the backup COPY, never pushed
+    backed_up = (v / "memory" / "dayos" / "days" / "2026-07-02.md").read_text()
+    assert "[REDACTED-SECRET]" in backed_up and "sk-ant-" not in backed_up
+    # ...but the SOURCE under memory/ is left exactly as-is
+    src = (memory.MEMORY_DIR / "dayos" / "days" / "2026-07-02.md").read_text()
+    assert "sk-ant-api03-" in src
     print("ok backup roundtrip")
 
 
