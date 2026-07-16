@@ -85,6 +85,14 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   crashed run does hit the ⚠️ banner.
   Suggested order after current deploys: Gmail → Drive → Calendar.
   Founder explainer: `docs/HOW_IT_WORKS.md`.
+- **DayOS organization plan written, awaiting founder review** (2026-07-16):
+  `docs/DAYOS_ORGANIZATION.md` — how the DayOS bank gets smarter for
+  minimal effort. Four-layer frame (raw → mechanical lenses → AI
+  distillation → ambient prompt); Phase A adds tag views, an open-loops
+  ledger, and a per-day `metrics.csv` (all pure code in the existing
+  sync, $0), Phase B adds a week-pulse + open-loops line to the prompt
+  snapshot, Phase C adds a monthly synthesis + standing `themes.md`
+  (~$0.25/yr). No app changes, no schema changes, nothing built yet.
 - Offline tests pass (`venv/bin/python tests/test_smoke.py`,
   `tests/test_dayos.py`, `tests/test_playbook.py`, `tests/test_digests.py`,
   `tests/test_whatsapp.py`, and `tests/test_youtube.py`).
@@ -235,6 +243,9 @@ memory. Budget ceiling ~$20/month all-in, target $8–15.
   wispr_export tests build a synthetic SQLite fixture since the real schema
   is unknown)
 - `docs/SECOND_BRAIN.md` — memory-bank architecture plan of record
+- `docs/DAYOS_ORGANIZATION.md` — the plan for organizing DayOS entries in
+  the brain (tag views, open-loops ledger, metrics table, monthly
+  synthesis + themes); proposed 2026-07-16, awaiting founder review
 - `docs/HOW_IT_WORKS.md` — plain-language explainer for the founder: how a
   huge file-based memory coexists with the model's small context (library/
   desk analogy + diagrams). Point him here when he asks "how does this not
