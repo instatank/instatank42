@@ -398,9 +398,21 @@ sessions run in the cloud" and the forward-only skill is the whole story.
       `cp -r .claude/skills/save-to-brain ~/.claude/skills/` from a
       2ndbrain clone — makes `/save-to-brain` available in every local
       session regardless of repo (2ndbrain README § install).
-- [ ] Founder, on the Mac: run `python3 brain_backfill.py --list` to find
-      out whether past sessions exist locally, then backfill if so. First
-      real run also validates the guessed JSONL schema.
+- [x] **`--list` ran on the real Mac (2026-07-16) — two answers:** the
+      JSONL parser works against real Claude Code transcripts (schema guess
+      validated: date/project/turns/first-message all correct), and the
+      execution-mode question is settled: only ONE session exists locally
+      (2026-03-30, "Management", 436 turns) — **his desktop-app sessions
+      execute in the cloud** and leave no Mac transcript. So batch backfill
+      covers exactly that one session; the rest of the history needs the
+      claude.ai data-export route (check pending below) or manual
+      resume + `/save-to-brain` triage.
+- [ ] Founder: backfill the one local session (`--dry-run` then run;
+      needs ANTHROPIC_API_KEY on the Mac; ~10–15¢).
+- [ ] Founder: claude.ai → Settings → Privacy → Export data — check
+      whether the archive includes Claude Code/desktop sessions. If yes,
+      a parser for that archive restores batch backfill for the cloud
+      history; if no, manual triage is the floor.
 - [ ] Habit: end meaningful sessions with `/save-to-brain` — the skill
       only captures sessions it's invoked in.
 - [ ] Founder: check the desktop app to determine local vs. remote
